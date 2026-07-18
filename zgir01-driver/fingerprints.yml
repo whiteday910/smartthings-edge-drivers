@@ -1,0 +1,9 @@
+zigbeeGeneric:
+  - id: "hobeianZgIr01"
+    deviceLabel: "HOBEIAN ZG-IR01 IR Remote"
+    clusters:
+      server:
+        - 0xEF00 #Tuya DP cluster
+        - 0xE004 #Zosung IR control cluster
+        - 0xED00 #Zosung IR transmit cluster
+    deviceProfileName: zg-ir01-main

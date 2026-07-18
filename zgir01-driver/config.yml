@@ -1,0 +1,4 @@
+name: 'HOBEIAN ZG-IR01 IR Remote Switch'
+packageKey: 'zg-ir01-hobeian'
+permissions:
+  zigbee: {}
