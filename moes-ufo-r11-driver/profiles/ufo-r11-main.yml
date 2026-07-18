@@ -1,18 +1,54 @@
 name: ufo-r11-main
 components:
 - id: main
+  label: "0"
   capabilities:
   - id: acrosswatch58328.irBlasterV3
     version: 1
   categories:
   - name: IrRemote
-preferences:
-  - name: slotCount
-    title: "학습 가능 신호 개수"
-    description: "메인 기기를 포함해 독립적으로 학습/재생할 신호 개수 (1~10). 늘리면 자식 기기가 자동 생성됩니다. 줄여도 이미 만든 자식 기기는 자동 삭제되지 않으니, 필요 없어지면 앱에서 직접 삭제하세요."
-    required: false
-    preferenceType: integer
-    definition:
-      minimum: 1
-      maximum: 10
-      default: 6
+- id: num1
+  label: "1"
+  capabilities:
+  - id: acrosswatch58328.irBlasterV3
+    version: 1
+- id: num2
+  label: "2"
+  capabilities:
+  - id: acrosswatch58328.irBlasterV3
+    version: 1
+- id: num3
+  label: "3"
+  capabilities:
+  - id: acrosswatch58328.irBlasterV3
+    version: 1
+- id: num4
+  label: "4"
+  capabilities:
+  - id: acrosswatch58328.irBlasterV3
+    version: 1
+- id: num5
+  label: "5"
+  capabilities:
+  - id: acrosswatch58328.irBlasterV3
+    version: 1
+- id: num6
+  label: "6"
+  capabilities:
+  - id: acrosswatch58328.irBlasterV3
+    version: 1
+- id: num7
+  label: "7"
+  capabilities:
+  - id: acrosswatch58328.irBlasterV3
+    version: 1
+- id: num8
+  label: "8"
+  capabilities:
+  - id: acrosswatch58328.irBlasterV3
+    version: 1
+- id: num9
+  label: "9"
+  capabilities:
+  - id: acrosswatch58328.irBlasterV3
+    version: 1

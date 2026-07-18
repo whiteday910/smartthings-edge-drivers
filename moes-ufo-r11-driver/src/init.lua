@@ -12,12 +12,13 @@
 -- and when the hub pushes a code to be transmitted.
 --
 -- Since code storage is entirely virtual (the physical device has no "slots" -- it
--- just decodes and blasts whatever bytes the hub currently sends it), multiple
--- independent learned codes are implemented on the SmartThings side as child devices
--- (see ../zgir01-driver for the same child-device convention), each with its own
--- learn/replay state. Zigbee messages always arrive addressed to the physical (parent)
--- device, so `active_target_key` tracks, per in-flight learn operation, which device
--- (main or a specific child) should receive the result.
+-- just decodes and blasts whatever bytes the hub currently sends it), this driver
+-- exposes ten independent learn/replay slots ("0" through "9") as ten *components* of
+-- a single device, so the whole remote lives on one device screen (like a TV remote)
+-- instead of spreading across separate child devices. Zigbee messages always arrive
+-- addressed to the single physical device with no indication of which component
+-- triggered them, so `active_component_id` tracks, per in-flight learn operation,
+-- which component should receive the result.
 --
 -- Ported/adapted from two independent open-source references (cross-checked against
 -- each other for consistency):
@@ -31,7 +32,6 @@
 -- Uint8, not a ZCLCommandId. If learn/send misbehaves again, logcat is the fastest
 -- way to see why.
 
-local st_device = require "st.device"
 local capabilities = require "st.capabilities"
 local ZigbeeDriver = require "st.zigbee"
 local zcl_messages = require "st.zigbee.zcl"
@@ -48,10 +48,11 @@ local CLUSTER_ZOSUNG_CONTROL = 0xE004
 local CLUSTER_ZOSUNG_TRANSMIT = 0xED00
 local ZOSUNG_MFG_CODE = 0x1002
 local CHUNK_SIZE = 0x38
-local DEFAULT_SLOT_COUNT = 6
 
 local IR_BLASTER_ID = "acrosswatch58328.irBlasterV3"
 local ir_blaster = capabilities[IR_BLASTER_ID]
+
+local COMPONENT_IDS = { "main", "num1", "num2", "num3", "num4", "num5", "num6", "num7", "num8", "num9" }
 
 --------------------------------------------------
 -- base64 (pure Lua, no external dependency)
@@ -106,56 +107,7 @@ local function base64_decode(data)
 end
 
 --------------------------------------------------
--- child device helpers
---
--- The physical device has a single Zigbee endpoint, so incoming Zigbee events
--- always arrive addressed to the parent device (children have no network
--- identity of their own) -- matching ../zgir01-driver's convention.
-
-local function child_key(n)
-  return string.format("%02d", n)
-end
-
--- The device to use for all Zigbee radio operations: always the physical/parent
--- device, regardless of which device (main or child) a capability command came in on.
-local function radio_device(device)
-  if device.network_type == st_device.NETWORK_TYPE_CHILD then
-    return device:get_parent_device()
-  end
-  return device
-end
-
-local function device_child_key(device)
-  if device.network_type == st_device.NETWORK_TYPE_CHILD then
-    return device.parent_assigned_child_key
-  end
-  return nil
-end
-
-local function find_child(parent, key)
-  return parent:get_child_by_parent_assigned_key(key)
-end
-
-local function create_child_devices(driver, device)
-  local count = tonumber(device.preferences.slotCount) or DEFAULT_SLOT_COUNT
-  for i = 2, count do
-    local key = child_key(i)
-    if device:get_child_by_parent_assigned_key(key) == nil then
-      driver:try_create_device({
-        type = "EDGE_CHILD",
-        parent_assigned_child_key = key,
-        label = device.label .. " " .. i,
-        profile = "ufo-r11-child",
-        parent_device_id = device.id,
-      })
-    end
-  end
-end
-
---------------------------------------------------
 -- low-level Zosung frame helpers
--- (all take the radio/parent device explicitly; callers are responsible for
--- resolving it via radio_device() first)
 
 local function crc_sum(bytes)
   local sum = 0
@@ -248,29 +200,26 @@ end
 --------------------------------------------------
 -- learn (device -> hub) and send (hub -> device) flows
 
--- Which device (main or a specific child) is the target for the in-flight learn
--- operation's result, tracked on the radio/parent device since that's the only one
--- that ever receives the physical Zigbee events.
-local function set_active_target(radio, device)
-  radio:set_field("active_target_key", device_child_key(device))
+-- Which component ("main", "num1", ... "num9") is the target for the in-flight learn
+-- operation's result -- necessary because incoming Zigbee events carry no indication
+-- of which component originally requested the learn.
+local function set_active_component(device, component_id)
+  device:set_field("active_component_id", component_id)
 end
 
-local function get_active_target(radio)
-  local key = radio:get_field("active_target_key")
-  if key == nil then return radio end
-  return radio:get_child_by_parent_assigned_key(key) or radio
+local function get_active_component(device)
+  return device:get_field("active_component_id") or "main"
 end
 
-local function start_learning(device)
-  local radio = radio_device(device)
-  set_active_target(radio, device)
-  send_ircontrol_json(radio, { study = 0 })
-  device:emit_event(ir_blaster.learningState("학습 중"))
+local function start_learning(device, component_id)
+  set_active_component(device, component_id)
+  send_ircontrol_json(device, { study = 0 })
+  device:emit_component_event(device.profile.components[component_id], ir_blaster.learningState("학습 중"))
 end
 
-local function stop_learning(device)
-  send_ircontrol_json(radio_device(device), { study = 1 })
-  device:emit_event(ir_blaster.learningState("대기"))
+local function stop_learning(device, component_id)
+  send_ircontrol_json(device, { study = 1 })
+  device:emit_component_event(device.profile.components[component_id], ir_blaster.learningState("대기"))
 end
 
 -- Builds the Zosung "key press" JSON message for a given code. `code` may be:
@@ -305,7 +254,6 @@ local function build_ir_message(code)
   })
 end
 
--- `device` here must already be the radio/parent device.
 local function send_ir_code(device, code)
   local ir_msg = build_ir_message(code)
   local seq = next_seq(device)
@@ -319,7 +267,6 @@ end
 
 --------------------------------------------------
 -- cluster 0xED00 inbound handlers
--- (always invoked with `device` = the physical/parent device)
 
 local function handle_frame_00(driver, device, zb_rx)
   local zclh = zb_rx.body.zcl_header
@@ -402,23 +349,24 @@ local function handle_frame_05(driver, device, zb_rx)
   device:set_field("zosung_learn_seq", nil)
   device:set_field("zosung_learn_length", nil)
 
-  local target = get_active_target(device)
+  local component_id = get_active_component(device)
+  local component = device.profile.components[component_id]
   local learned_code = base64_encode(buffer)
-  target:emit_event(ir_blaster.learnedCode(learned_code))
-  target:emit_event(ir_blaster.learnedCodeStatus("저장됨"))
-  log.info("TS1201: learned a new IR code (" .. #buffer .. " bytes) for " .. target.label)
-  stop_learning(target)
+  device:emit_component_event(component, ir_blaster.learnedCode(learned_code))
+  device:emit_component_event(component, ir_blaster.learnedCodeStatus("저장됨"))
+  log.info("TS1201: learned a new IR code (" .. #buffer .. " bytes) for component " .. component_id)
+  stop_learning(device, component_id)
 end
 
 --------------------------------------------------
 -- capability command handlers
 
 local function cap_learn(driver, device, command)
-  start_learning(device)
+  start_learning(device, command.component)
 end
 
 local function cap_cancel_learn(driver, device, command)
-  stop_learning(device)
+  stop_learning(device, command.component)
 end
 
 local function cap_send_code(driver, device, command)
@@ -427,56 +375,47 @@ local function cap_send_code(driver, device, command)
     log.warn("TS1201: sendCode called with empty code")
     return
   end
-  send_ir_code(radio_device(device), code)
+  send_ir_code(device, code)
 end
 
--- Replays whatever is currently in this device's learnedCode. The SmartThings app has
--- no free-text input UI for custom capability commands, so this no-argument button is
--- the only way to trigger a replay from the app itself (sendCode(code) still exists
--- for CLI/Rules).
+-- Replays whatever is currently in this component's learnedCode. The SmartThings app
+-- has no free-text input UI for custom capability commands, so this no-argument
+-- button is the only way to trigger a replay from the app itself (sendCode(code)
+-- still exists for CLI/Rules).
 local function cap_send(driver, device, command)
-  local code = device:get_latest_state("main", IR_BLASTER_ID, "learnedCode")
+  local code = device:get_latest_state(command.component, IR_BLASTER_ID, "learnedCode")
   if code == nil or code:match("^%s*$") then
-    log.warn("TS1201: replayLearnedCode pressed with no learnedCode yet")
+    log.warn("TS1201: replayLearnedCode pressed with no learnedCode yet (component " .. command.component .. ")")
     return
   end
-  send_ir_code(radio_device(device), code)
+  send_ir_code(device, code)
 end
 
 --------------------------------------------------
 
--- Backfills default state for attributes that have never been reported yet (e.g. a
--- device that already existed before this profile/capability was assigned to it, so
--- lifecycle "added" never fires again to set them).
+-- Backfills default state for components that have never reported anything yet
+-- (a fresh pairing, or an already-paired device that just gained new components
+-- from a profile update -- lifecycle "added" won't refire for those).
 local function ensure_defaults(device)
-  if device:get_latest_state("main", IR_BLASTER_ID, "learningState") == nil then
-    device:emit_event(ir_blaster.learningState("대기"))
-  end
-  if device:get_latest_state("main", IR_BLASTER_ID, "learnedCodeStatus") == nil then
-    device:emit_event(ir_blaster.learnedCodeStatus("없음"))
+  for _, component_id in ipairs(COMPONENT_IDS) do
+    local component = device.profile.components[component_id]
+    if component ~= nil then
+      if device:get_latest_state(component_id, IR_BLASTER_ID, "learningState") == nil then
+        device:emit_component_event(component, ir_blaster.learningState("대기"))
+      end
+      if device:get_latest_state(component_id, IR_BLASTER_ID, "learnedCodeStatus") == nil then
+        device:emit_component_event(component, ir_blaster.learnedCodeStatus("없음"))
+      end
+    end
   end
 end
 
 local function device_added(driver, device)
   ensure_defaults(device)
-  if device.network_type == st_device.NETWORK_TYPE_CHILD then return end
-  create_child_devices(driver, device)
 end
 
 local function device_init(driver, device)
   ensure_defaults(device)
-  if device.network_type == st_device.NETWORK_TYPE_CHILD then return end
-  device:set_find_child(find_child)
-  create_child_devices(driver, device)
-end
-
-local function info_changed(driver, device, event, args)
-  if device.network_type == st_device.NETWORK_TYPE_CHILD then return end
-  local old = args.old_st_store.preferences
-  local new = device.preferences
-  if old.slotCount ~= new.slotCount then
-    create_child_devices(driver, device)
-  end
 end
 
 local ts1201_driver = {
@@ -506,7 +445,6 @@ local ts1201_driver = {
   lifecycle_handlers = {
     added = device_added,
     init = device_init,
-    infoChanged = info_changed,
   },
   health_check = false,
 }
