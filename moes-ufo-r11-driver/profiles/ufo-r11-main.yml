@@ -6,3 +6,13 @@ components:
     version: 1
   categories:
   - name: IrRemote
+preferences:
+  - name: slotCount
+    title: "학습 가능 신호 개수"
+    description: "메인 기기를 포함해 독립적으로 학습/재생할 신호 개수 (1~10). 늘리면 자식 기기가 자동 생성됩니다. 줄여도 이미 만든 자식 기기는 자동 삭제되지 않으니, 필요 없어지면 앱에서 직접 삭제하세요."
+    required: false
+    preferenceType: integer
+    definition:
+      minimum: 1
+      maximum: 10
+      default: 6

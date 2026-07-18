@@ -1,0 +1,8 @@
+name: ufo-r11-child
+components:
+- id: main
+  capabilities:
+  - id: acrosswatch58328.irBlasterV3
+    version: 1
+  categories:
+  - name: IrRemote
