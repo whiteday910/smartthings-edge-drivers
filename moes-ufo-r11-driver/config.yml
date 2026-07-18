@@ -1,4 +1,4 @@
-name: 'MOES Tuya Zigbee Smart IR Remote Control'
+name: 'MOES UFO-R11 Smart IR Remote Control'
 packageKey: 'ts1201-ir-blaster'
 permissions:
   zigbee: {}

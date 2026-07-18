@@ -1,8 +1,8 @@
 zigbeeGeneric:
-  - id: "tuyaZosungTs1201"
-    deviceLabel: "MOES Smart IR Remote Control"
+  - id: "moesUfoR11"
+    deviceLabel: "MOES UFO-R11 IR Remote Control"
     clusters:
       server:
         - 0xE004 #Zosung IR control cluster
         - 0xED00 #Zosung IR transmit cluster
-    deviceProfileName: ts1201-main
+    deviceProfileName: ufo-r11-main

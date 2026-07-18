@@ -1,5 +1,7 @@
--- Tuya/Zosung TS1201 Universal IR Blaster (e.g. _TZ3290_ot6ewjvmejq5ekhl, also sold as
--- Moes UFO-R11 / Aubess ZXZIR-02 / Zemismart ZS06 and other rebrands).
+-- MOES UFO-R11 "Tuya ZigBee Smart IR Remote Control Universal Infrared Remote
+-- Controller" (chipset reports as manufacturer _TZ3290_ot6ewjvmejq5ekhl, modelID
+-- TS1201; the same chipset/protocol is also sold as Aubess ZXZIR-02, Zemismart ZS06,
+-- and other rebrands).
 --
 -- Unlike HOBEIAN ZG-IR01 (see ../zgir01-driver), this device has no on-device switch
 -- slots: it learns exactly one arbitrary IR code at a time and reports the raw learned
@@ -14,9 +16,11 @@
 --   - zigbee-herdsman-converters lib/zosung.ts (Koenkk/zigbee-herdsman-converters)
 --   - zhaquirks/tuya/ts1201.py (zigpy/zha-device-handlers), which explicitly lists
 --     _TZ3290_ot6ewjvmejq5ekhl as a supported manufacturer for this exact model.
--- This has not been verified against the physical device. If pairing or learn/send
--- doesn't work as expected, capture Live Logging (smartthings edge:drivers:logcat)
--- and share it so the frame layout can be corrected.
+-- Pairing (fingerprint match) and capability command/status plumbing have been
+-- confirmed against the physical device. The learn/send chunked-transfer round trip
+-- itself (actually capturing a code from a real remote) is still pending real-world
+-- confirmation. If it behaves oddly, capture Live Logging
+-- (smartthings edge:drivers:logcat) and share it so the frame layout can be corrected.
 
 local capabilities = require "st.capabilities"
 local ZigbeeDriver = require "st.zigbee"
