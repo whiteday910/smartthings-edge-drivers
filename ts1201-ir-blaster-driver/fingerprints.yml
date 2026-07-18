@@ -1,6 +1,6 @@
 zigbeeGeneric:
   - id: "tuyaZosungTs1201"
-    deviceLabel: "TS1201 IR Blaster"
+    deviceLabel: "MOES Smart IR Remote Control"
     clusters:
       server:
         - 0xE004 #Zosung IR control cluster

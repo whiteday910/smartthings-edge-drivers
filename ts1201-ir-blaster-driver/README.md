@@ -1,6 +1,6 @@
-# Tuya/Zosung TS1201 Universal IR Blaster SmartThings Edge Driver
+# MOES Tuya Zigbee Smart IR Remote Control SmartThings Edge Driver
 
-`_TZ3290_ot6ewjvmejq5ekhl` / modelID `TS1201` 지그비 IR 블라스터 기기를 위한 SmartThings Edge 드라이버입니다. 같은 하드웨어가 Moes UFO-R11, Aubess ZXZIR-02, Zemismart ZS06 등 여러 브랜드로 재판매되고 있습니다.
+MOES에서 판매하는 "Tuya ZigBee Smart IR Remote Control Universal Infrared Remote Controller" 기기(`_TZ3290_ot6ewjvmejq5ekhl` / modelID `TS1201`)를 위한 SmartThings Edge 드라이버입니다. 같은 하드웨어가 Aubess ZXZIR-02, Zemismart ZS06 등 다른 브랜드로도 재판매되고 있습니다.
 
 ## HOBEIAN ZG-IR01과 다른 점
 
@@ -63,7 +63,7 @@ smartthings edge:channels:assign
 smartthings edge:drivers:install
 ```
 
-허브를 선택하고 방금 패키징한 드라이버를 설치한 뒤, SmartThings 앱 > 기기 추가 > 검색으로 TS1201을 페어링하세요. 정상 매칭되면 "TS1201 IR Blaster"로 표시됩니다.
+허브를 선택하고 방금 패키징한 드라이버를 설치한 뒤, SmartThings 앱 > 기기 추가 > 검색으로 TS1201을 페어링하세요. 정상 매칭되면 "MOES Smart IR Remote Control"로 표시됩니다.
 
 ### 3. 코드 학습 및 재생
 
