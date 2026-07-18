@@ -1,0 +1,4 @@
+name: 'Tuya Zosung TS1201 Universal IR Blaster'
+packageKey: 'ts1201-ir-blaster'
+permissions:
+  zigbee: {}

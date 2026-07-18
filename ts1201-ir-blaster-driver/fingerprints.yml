@@ -1,0 +1,8 @@
+zigbeeGeneric:
+  - id: "tuyaZosungTs1201"
+    deviceLabel: "TS1201 IR Blaster"
+    clusters:
+      server:
+        - 0xE004 #Zosung IR control cluster
+        - 0xED00 #Zosung IR transmit cluster
+    deviceProfileName: ts1201-main
