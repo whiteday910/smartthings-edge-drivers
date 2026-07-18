@@ -16,11 +16,12 @@
 --   - zigbee-herdsman-converters lib/zosung.ts (Koenkk/zigbee-herdsman-converters)
 --   - zhaquirks/tuya/ts1201.py (zigpy/zha-device-handlers), which explicitly lists
 --     _TZ3290_ot6ewjvmejq5ekhl as a supported manufacturer for this exact model.
--- Pairing (fingerprint match) and capability command/status plumbing have been
--- confirmed against the physical device. The learn/send chunked-transfer round trip
--- itself (actually capturing a code from a real remote) is still pending real-world
--- confirmation. If it behaves oddly, capture Live Logging
--- (smartthings edge:drivers:logcat) and share it so the frame layout can be corrected.
+-- Full learn + send round trip confirmed against the physical device via Live Logging
+-- (smartthings edge:drivers:logcat). Two SDK API mistakes were caught and fixed this
+-- way: FrameCtrl's getter is is_disable_default_response_set() (not
+-- is_disable_default_response()), and DefaultResponse's cmd argument must be a
+-- Uint8, not a ZCLCommandId. If learn/send misbehaves again, logcat is the fastest
+-- way to see why.
 
 local capabilities = require "st.capabilities"
 local ZigbeeDriver = require "st.zigbee"
@@ -111,11 +112,12 @@ local function next_seq(device)
 end
 
 local function send_zosung_frame(device, cluster_id, cmd_id, payload_bytes)
-  local zclh = zcl_messages.ZclHeader({ cmd = data_types.ZCLCommandId(cmd_id) })
+  local header_args = { cmd = data_types.ZCLCommandId(cmd_id) }
+  header_args.mfg_code = data_types.validate_or_build_type(ZOSUNG_MFG_CODE, data_types.Uint16, "mfg_code")
+  local zclh = zcl_messages.ZclHeader(header_args)
   zclh.frame_ctrl:set_cluster_specific()
   zclh.frame_ctrl:set_mfg_specific()
   zclh.frame_ctrl:set_disable_default_response()
-  zclh.mfg_code = data_types.Uint16(ZOSUNG_MFG_CODE)
   local addrh = messages.AddressHeader(
     zb_const.HUB.ADDR,
     zb_const.HUB.ENDPOINT,
@@ -132,13 +134,14 @@ end
 -- Reply with a ZCL Default Response if the incoming frame asked for one (the Zosung
 -- transmit cluster otherwise retries the same frame indefinitely).
 local function maybe_ack(device, zclh)
-  if zclh.frame_ctrl:is_disable_default_response() then return end
-  local dr_zclh = zcl_messages.ZclHeader({
+  if zclh.frame_ctrl:is_disable_default_response_set() then return end
+  local dr_header_args = {
     cmd = data_types.ZCLCommandId(default_response.DefaultResponse.ID),
     seqno = data_types.Uint8(zclh.seqno.value),
-  })
+  }
+  dr_header_args.mfg_code = data_types.validate_or_build_type(ZOSUNG_MFG_CODE, data_types.Uint16, "mfg_code")
+  local dr_zclh = zcl_messages.ZclHeader(dr_header_args)
   dr_zclh.frame_ctrl:set_mfg_specific()
-  dr_zclh.mfg_code = data_types.Uint16(ZOSUNG_MFG_CODE)
   local addrh = messages.AddressHeader(
     zb_const.HUB.ADDR,
     zb_const.HUB.ENDPOINT,
@@ -147,7 +150,7 @@ local function maybe_ack(device, zclh)
     zb_const.HA_PROFILE_ID,
     CLUSTER_ZOSUNG_TRANSMIT
   )
-  local dr_body = default_response.DefaultResponse(data_types.ZCLCommandId(zclh.cmd.value), zcl_types.ZclStatus.SUCCESS)
+  local dr_body = default_response.DefaultResponse(data_types.Uint8(zclh.cmd.value), zcl_types.ZclStatus.SUCCESS)
   local message_body = zcl_messages.ZclMessageBody({ zcl_header = dr_zclh, zcl_body = dr_body })
   device:send(messages.ZigbeeMessageTx({ address_header = addrh, body = message_body }))
 end

@@ -58,14 +58,15 @@ smartthings devices:commands <deviceId> 'acrosswatch58328.irBlaster:sendCode("<l
 - 두 개의 독립적인 오픈소스 구현(zigbee-herdsman-converters의 `lib/zosung.ts`, ZHA의 `zhaquirks/tuya/ts1201.py` — 이 파일은 `_TZ3290_ot6ewjvmejq5ekhl`를 명시적으로 지원 목록에 포함)을 서로 대조하며 프로토콜을 파악해서 이식했습니다.
 - fingerprint는 특정 manufacturer 문자열 대신 클러스터 조합(`0xE004`+`0xED00`)으로 매칭하므로, 같은 칩셋의 다른 manufacturer 문자열 변형(`_TZ3290_j37rooaxrcdcqo5n`, `_TZ3290_7v1k4vufotpowp9z` 등)에서도 동작할 가능성이 높습니다.
 
-## ⚠️ 검증 상태
+## ✅ 검증 상태
 
-페어링(fingerprint 매칭)과 capability 명령/상태 읽기까지는 실기기로 확인했습니다. 다만 실제 리모컨 신호를 학습해서 청크 전송 핸드셰이크 전체가 끝까지 정상 동작하는지는 아직 실사용으로 확인 전입니다. 특히:
+실기기(정휘방 스테이션 허브 + 실제 UFO-R11)로 학습(learn)과 재생(sendCode) 전체 핸드셰이크를 Live Logging으로 확인했습니다 — 리모컨 신호 학습, `learnedCode` 저장, 저장된 코드 재전송까지 에러 없이 끝까지 동작합니다.
 
-- 청크 전송 핸드셰이크(체크섬, 시퀀스 번호, Default Response 응답)의 세부 바이트 레이아웃
-- `learnedCode`로 노출되는 base64 데이터가 다른 통합(HA 등)과 100% 동일한 포맷인지 여부
+디버깅 과정에서 발견해 수정한 버그 2건 (둘 다 SmartThings Lua SDK API를 잘못 추측해서 생긴 문제였습니다):
+- `frame_ctrl:is_disable_default_response()` → 실제로는 `is_disable_default_response_set()`이 맞는 메서드명이었습니다. 이 오타 때문에 기기가 학습 데이터를 보낼 때마다 드라이버가 즉시 크래시해서 아무 응답도 못 보내고 있었습니다.
+- `DefaultResponse(cmd, status)`의 `cmd` 인자는 `ZCLCommandId`가 아니라 `Uint8` 타입이어야 했습니다.
 
-학습/전송이 예상과 다르게 동작하면 SmartThings 앱의 Live Logging(CLI: `smartthings edge:drivers:logcat`) 로그를 캡처해서 알려주세요. 로그를 보고 바이트 레이아웃을 수정할 수 있습니다.
+두 문제 모두 `smartthings edge:drivers:logcat`으로 실시간 로그를 보고 나서야 정확히 잡을 수 있었습니다. 학습/전송이 다시 이상하게 동작하면 같은 방법으로 로그를 확인해주세요.
 
 ## 설치 방법
 
