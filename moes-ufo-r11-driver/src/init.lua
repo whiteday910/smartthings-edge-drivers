@@ -394,7 +394,7 @@ local ts1201_driver = {
       ["learn"] = cap_learn,
       ["cancelLearn"] = cap_cancel_learn,
       ["sendCode"] = cap_send_code,
-      ["send"] = cap_send,
+      ["replayLearnedCode"] = cap_send,
     },
   },
   lifecycle_handlers = {
