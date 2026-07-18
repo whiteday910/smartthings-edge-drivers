@@ -17,20 +17,23 @@ MOES에서 판매하는 "Tuya ZigBee Smart IR Remote Control Universal Infrared 
 
 - **학습 시작 (표준 `momentary` 버튼, 또는 커스텀 `learn` 명령)**: 기기를 학습 모드로 전환합니다. 이후 몇 초 안에 기존 리모컨을 기기에 가까이 대고 버튼을 누르면 코드가 학습됩니다.
 - **학습 취소 (`cancelLearn`)**: 코드를 캡처하지 않고 학습 모드를 종료합니다.
-- **학습된 코드 (`learnedCode`, 읽기 전용)**: 가장 최근에 학습된 코드가 base64 문자열로 표시됩니다. 복사해서 자동화(오토메이션)나 다른 곳에 저장해두고 재사용할 수 있습니다.
-- **코드 전송 (`sendCode`, 문자열 인자 `code`)**: `learnedCode`에서 복사한 base64 문자열을 그대로 붙여넣으면 그 코드를 재전송합니다. 필요하면 `{"key_num":1,"delay":300,"key1":{"num":1,"freq":38000,"type":1,"key_code":"..."}}` 형태의 전체 JSON을 직접 넣어 `freq`/`delay` 등을 조정할 수도 있습니다.
+- **학습된 코드 (`learnedCode`, 읽기 전용)**: 가장 최근에 학습된 코드가 base64 문자열로 표시됩니다.
+- **학습된 코드 송출 (`send`, 인자 없음)**: `learnedCode`에 저장된 가장 최근 학습 코드를 그대로 재전송합니다. 앱은 커스텀 capability에 텍스트 입력 UI를 지원하지 않아서, 인자를 받는 `sendCode(code)` 대신 이 버튼 하나로 "방금 학습한 걸 다시 재생"하는 가장 흔한 시나리오를 앱에서 바로 처리합니다.
+- **코드 전송 (`sendCode`, 문자열 인자 `code`, CLI/자동화 전용)**: 임의의 저장된 코드나 `{"key_num":1,"delay":300,"key1":{"num":1,"freq":38000,"type":1,"key_code":"..."}}` 형태의 전체 JSON을 넣어 전송합니다. 텍스트 인자가 필요해서 앱 UI에서는 실행할 수 없고 CLI/Rules API로만 호출 가능합니다.
 
 학습 상태(`learningState`: `idle`/`learning`)도 함께 노출되어, 코드 캡처가 완료되면 자동으로 `idle`로 돌아갑니다.
 
-커스텀 capability 화면 표시(presentation)도 만들어져 있어서, 기기 상세 화면에 학습 상태/학습된 코드 텍스트와 학습 시작/취소 버튼이 표시됩니다. 단, `sendCode`처럼 텍스트를 직접 입력해야 하는 명령은 SmartThings 앱 자체가 커스텀 capability에 텍스트 입력 UI를 지원하지 않아서, 앱에서 직접 실행할 수 없습니다 — 아래 "사용법" 항목의 CLI 방법을 사용하세요.
+**참고 (다중 코드 미지원)**: 이 기기는 슬롯이 없어서 한 번에 코드 하나만 기억합니다. 새로 학습하면 이전에 학습한 코드는 덮어씌워집니다. TV/에어컨 등 여러 버튼을 각각 저장해두고 쓰려면 학습된 코드를 CLI로 복사해 별도 보관했다가 `sendCode`로 재생하거나, 버튼별로 별도 자식 기기를 만드는 구조로 확장해야 합니다 — 필요하면 알려주세요.
 
 ## 사용법
 
 ### 앱에서
 
-기기 상세 화면의 "학습 시작" 버튼(또는 momentary 버튼)을 누르고, 몇 초 안에 기존 리모컨을 기기에 가까이 대고 버튼을 누르세요. "학습된 코드" 텍스트에 base64 코드가 표시되면 성공입니다.
+1. 기기 상세 화면에서 "학습 시작"(또는 momentary) 버튼을 누름
+2. 몇 초 안에 기존 리모컨을 기기에 가까이 대고 버튼을 누름 → "학습된 코드"에 base64 코드가 표시되면 성공
+3. "학습된 코드 송출" 버튼을 누르면 방금 학습한 코드가 재생됨
 
-### CLI에서 (코드 전송까지 하려면 필요)
+### CLI에서 (여러 코드를 따로 보관하고 싶을 때)
 
 ```
 # 1. 학습 시작
@@ -38,11 +41,11 @@ smartthings devices:commands <deviceId> 'acrosswatch58328.irBlaster:learn()'
 
 # 2. (기존 리모컨을 기기에 가까이 대고 버튼을 누름)
 
-# 3. 학습된 코드 확인
+# 3. 학습된 코드 확인 (따로 복사/보관)
 smartthings devices:capability-status <deviceId> main acrosswatch58328.irBlaster
 
-# 4. 학습된 코드 재전송(재생)
-smartthings devices:commands <deviceId> 'acrosswatch58328.irBlaster:sendCode("<learnedCode 값>")'
+# 4. 보관해둔 코드 재전송(재생) — 꼭 방금 학습한 코드가 아니어도 됨
+smartthings devices:commands <deviceId> 'acrosswatch58328.irBlaster:sendCode("<코드 값>")'
 ```
 
 `<deviceId>`는 `smartthings devices`로 조회할 수 있습니다.
@@ -67,6 +70,8 @@ smartthings devices:commands <deviceId> 'acrosswatch58328.irBlaster:sendCode("<l
 - `DefaultResponse(cmd, status)`의 `cmd` 인자는 `ZCLCommandId`가 아니라 `Uint8` 타입이어야 했습니다.
 
 두 문제 모두 `smartthings edge:drivers:logcat`으로 실시간 로그를 보고 나서야 정확히 잡을 수 있었습니다. 학습/전송이 다시 이상하게 동작하면 같은 방법으로 로그를 확인해주세요.
+
+**참고**: 커스텀 capability에 명령(`send`)을 나중에 추가했더니, SmartThings 클라우드가 그 기기의 capability 스키마 캐시를 한동안 갱신하지 않아 "send is not a valid value" 오류가 한동안 발생했습니다. 프로필 내용을 살짝 바꿔 재배포하고 몇 분 기다리니 해결됐습니다 — 캐시 전파 지연이라 드라이버 코드 문제는 아니었습니다. 앱에서 "학습된 코드 송출" 버튼이 안 먹히면 몇 분 뒤 다시 시도해보세요.
 
 ## 설치 방법
 

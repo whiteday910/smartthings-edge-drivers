@@ -351,6 +351,18 @@ local function cap_send_code(driver, device, command)
   send_ir_code(device, code)
 end
 
+-- Replays whatever is currently in learnedCode. The SmartThings app has no free-text
+-- input UI for custom capability commands, so this no-argument button is the only way
+-- to trigger a replay from the app itself (sendCode(code) still exists for CLI/Rules).
+local function cap_send(driver, device, command)
+  local code = device:get_latest_state("main", "acrosswatch58328.irBlaster", "learnedCode")
+  if code == nil or code:match("^%s*$") then
+    log.warn("TS1201: send pressed with no learnedCode yet")
+    return
+  end
+  send_ir_code(device, code)
+end
+
 --------------------------------------------------
 
 local function device_added(driver, device)
@@ -378,10 +390,11 @@ local ts1201_driver = {
     [capabilities.momentary.ID] = {
       [capabilities.momentary.commands.push.NAME] = cap_learn,
     },
-    [ir_blaster.ID] = {
-      [ir_blaster.commands.learn.NAME] = cap_learn,
-      [ir_blaster.commands.cancelLearn.NAME] = cap_cancel_learn,
-      [ir_blaster.commands.sendCode.NAME] = cap_send_code,
+    ["acrosswatch58328.irBlaster"] = {
+      ["learn"] = cap_learn,
+      ["cancelLearn"] = cap_cancel_learn,
+      ["sendCode"] = cap_send_code,
+      ["send"] = cap_send,
     },
   },
   lifecycle_handlers = {
