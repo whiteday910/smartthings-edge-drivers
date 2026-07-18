@@ -40,7 +40,7 @@ local CLUSTER_ZOSUNG_TRANSMIT = 0xED00
 local ZOSUNG_MFG_CODE = 0x1002
 local CHUNK_SIZE = 0x38
 
-local ir_blaster = capabilities["acrosswatch58328.irBlaster"]
+local ir_blaster = capabilities["acrosswatch58328.irBlasterV2"]
 
 --------------------------------------------------
 -- base64 (pure Lua, no external dependency)
@@ -355,7 +355,7 @@ end
 -- input UI for custom capability commands, so this no-argument button is the only way
 -- to trigger a replay from the app itself (sendCode(code) still exists for CLI/Rules).
 local function cap_send(driver, device, command)
-  local code = device:get_latest_state("main", "acrosswatch58328.irBlaster", "learnedCode")
+  local code = device:get_latest_state("main", "acrosswatch58328.irBlasterV2", "learnedCode")
   if code == nil or code:match("^%s*$") then
     log.warn("TS1201: send pressed with no learnedCode yet")
     return
@@ -390,7 +390,7 @@ local ts1201_driver = {
     [capabilities.momentary.ID] = {
       [capabilities.momentary.commands.push.NAME] = cap_learn,
     },
-    ["acrosswatch58328.irBlaster"] = {
+    ["acrosswatch58328.irBlasterV2"] = {
       ["learn"] = cap_learn,
       ["cancelLearn"] = cap_cancel_learn,
       ["sendCode"] = cap_send_code,
