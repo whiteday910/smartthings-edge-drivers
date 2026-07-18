@@ -40,7 +40,8 @@ local CLUSTER_ZOSUNG_TRANSMIT = 0xED00
 local ZOSUNG_MFG_CODE = 0x1002
 local CHUNK_SIZE = 0x38
 
-local ir_blaster = capabilities["acrosswatch58328.irBlasterV2"]
+local IR_BLASTER_ID = "acrosswatch58328.irBlasterV3"
+local ir_blaster = capabilities[IR_BLASTER_ID]
 
 --------------------------------------------------
 -- base64 (pure Lua, no external dependency)
@@ -190,12 +191,12 @@ end
 
 local function start_learning(device)
   send_ircontrol_json(device, { study = 0 })
-  device:emit_event(ir_blaster.learningState("learning"))
+  device:emit_event(ir_blaster.learningState("학습 중"))
 end
 
 local function stop_learning(device)
   send_ircontrol_json(device, { study = 1 })
-  device:emit_event(ir_blaster.learningState("idle"))
+  device:emit_event(ir_blaster.learningState("대기"))
 end
 
 -- Builds the Zosung "key press" JSON message for a given code. `code` may be:
@@ -327,6 +328,7 @@ local function handle_frame_05(driver, device, zb_rx)
 
   local learned_code = base64_encode(buffer)
   device:emit_event(ir_blaster.learnedCode(learned_code))
+  device:emit_event(ir_blaster.learnedCodeStatus("저장됨"))
   log.info("TS1201: learned a new IR code (" .. #buffer .. " bytes)")
   stop_learning(device)
 end
@@ -355,7 +357,7 @@ end
 -- input UI for custom capability commands, so this no-argument button is the only way
 -- to trigger a replay from the app itself (sendCode(code) still exists for CLI/Rules).
 local function cap_send(driver, device, command)
-  local code = device:get_latest_state("main", "acrosswatch58328.irBlasterV2", "learnedCode")
+  local code = device:get_latest_state("main", IR_BLASTER_ID, "learnedCode")
   if code == nil or code:match("^%s*$") then
     log.warn("TS1201: send pressed with no learnedCode yet")
     return
@@ -365,13 +367,28 @@ end
 
 --------------------------------------------------
 
+-- Backfills default state for attributes that have never been reported yet (e.g. a
+-- device that already existed before this profile/capability was assigned to it, so
+-- lifecycle "added" never fires again to set them).
+local function ensure_defaults(device)
+  if device:get_latest_state("main", IR_BLASTER_ID, "learningState") == nil then
+    device:emit_event(ir_blaster.learningState("대기"))
+  end
+  if device:get_latest_state("main", IR_BLASTER_ID, "learnedCodeStatus") == nil then
+    device:emit_event(ir_blaster.learnedCodeStatus("없음"))
+  end
+end
+
 local function device_added(driver, device)
-  device:emit_event(ir_blaster.learningState("idle"))
+  ensure_defaults(device)
+end
+
+local function device_init(driver, device)
+  ensure_defaults(device)
 end
 
 local ts1201_driver = {
   supported_capabilities = {
-    capabilities.momentary,
     ir_blaster,
   },
   zigbee_handlers = {
@@ -387,10 +404,7 @@ local ts1201_driver = {
     },
   },
   capability_handlers = {
-    [capabilities.momentary.ID] = {
-      [capabilities.momentary.commands.push.NAME] = cap_learn,
-    },
-    ["acrosswatch58328.irBlasterV2"] = {
+    [IR_BLASTER_ID] = {
       ["learn"] = cap_learn,
       ["cancelLearn"] = cap_cancel_learn,
       ["sendCode"] = cap_send_code,
@@ -399,6 +413,7 @@ local ts1201_driver = {
   },
   lifecycle_handlers = {
     added = device_added,
+    init = device_init,
   },
   health_check = false,
 }

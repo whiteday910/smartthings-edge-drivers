@@ -2,9 +2,7 @@ name: ufo-r11-main
 components:
 - id: main
   capabilities:
-  - id: acrosswatch58328.irBlasterV2
-    version: 1
-  - id: momentary
+  - id: acrosswatch58328.irBlasterV3
     version: 1
   categories:
   - name: IrRemote

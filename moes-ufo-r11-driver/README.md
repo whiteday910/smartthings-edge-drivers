@@ -11,17 +11,21 @@ MOES에서 판매하는 "Tuya ZigBee Smart IR Remote Control Universal Infrared 
 
 이 데이터 왕복은 "Zosung" 프로토콜이라는 비표준 커스텀 프로토콜(JSON 제어 명령 + 청크 분할 바이너리 전송)로 이루어집니다. ZG-IR01 드라이버 README에서 "리버스 엔지니어링된 비표준 프로토콜이라 구현 범위에서 제외했다"고 언급한 것이 바로 이 프로토콜이며, 이번 드라이버가 그 프로토콜을 구현합니다.
 
-## 지원 기능
+## 지원 기능 및 앱 화면 구성
 
-표준 `momentary` capability(앱에 큼직한 버튼으로 표시됨)와 커스텀 capability `acrosswatch58328.irBlasterV2`를 통해:
+커스텀 capability `acrosswatch58328.irBlasterV3` 하나로 동작하며, 기기 상세 화면에 위에서부터 다음 순서로 표시됩니다:
 
-- **학습 시작 (표준 `momentary` 버튼, 또는 커스텀 `learn` 명령)**: 기기를 학습 모드로 전환합니다. 이후 몇 초 안에 기존 리모컨을 기기에 가까이 대고 버튼을 누르면 코드가 학습됩니다.
-- **학습 취소 (`cancelLearn`)**: 코드를 캡처하지 않고 학습 모드를 종료합니다.
-- **학습된 코드 (`learnedCode`, 읽기 전용)**: 가장 최근에 학습된 코드가 base64 문자열로 표시됩니다.
-- **학습된 코드 송출 (`replayLearnedCode`, 인자 없음)**: `learnedCode`에 저장된 가장 최근 학습 코드를 그대로 재전송합니다. 앱은 커스텀 capability에 텍스트 입력 UI를 지원하지 않아서, 인자를 받는 `sendCode(code)` 대신 이 버튼 하나로 "방금 학습한 걸 다시 재생"하는 가장 흔한 시나리오를 앱에서 바로 처리합니다.
-- **코드 전송 (`sendCode`, 문자열 인자 `code`, CLI/자동화 전용)**: 임의의 저장된 코드나 `{"key_num":1,"delay":300,"key1":{"num":1,"freq":38000,"type":1,"key_code":"..."}}` 형태의 전체 JSON을 넣어 전송합니다. 텍스트 인자가 필요해서 앱 UI에서는 실행할 수 없고 CLI/Rules API로만 호출 가능합니다.
+| 화면 표시 | 종류 | 설명 |
+|---|---|---|
+| 학습 상태 | 상태 텍스트 | `대기` / `학습 중` |
+| 저장된 신호 | 상태 텍스트 | `없음` / `저장됨` — 재생 가능한 코드가 있는지 한눈에 확인 |
+| 새 신호 학습 | 버튼 (`learn`) | 학습 모드로 전환. 이후 몇 초 안에 기존 리모컨을 기기에 가까이 대고 버튼을 누르면 신호가 저장됩니다 |
+| 학습 취소 | 버튼 (`cancelLearn`) | 신호를 저장하지 않고 학습 모드 종료 |
+| 저장된 신호 재생 | 버튼 (`replayLearnedCode`) | 가장 최근 학습한 신호를 그대로 재전송 |
 
-학습 상태(`learningState`: `idle`/`learning`)도 함께 노출되어, 코드 캡처가 완료되면 자동으로 `idle`로 돌아갑니다.
+기기 목록(대시보드) 카드에도 "저장된 신호" 상태가 바로 보여서, 상세 화면을 열지 않아도 재생 가능 여부를 알 수 있습니다.
+
+원시 base64 코드 값은 앱 화면에는 더 이상 노출하지 않습니다 (일반 사용자에게는 의미 없는 긴 문자열이라 화면에서 뺐습니다). 코드를 CLI로 확인/백업하려면 `capability-status`로 `learnedCode` 속성을 조회하면 됩니다. CLI 전용 고급 명령 `sendCode(code)`(임의의 저장된 코드나 직접 만든 JSON을 전송)도 그대로 남아 있습니다 — 텍스트 인자가 필요해서 앱 UI에는 노출되지 않고 CLI/Rules API로만 호출 가능합니다.
 
 **참고 (다중 코드 미지원)**: 이 기기는 슬롯이 없어서 한 번에 코드 하나만 기억합니다. 새로 학습하면 이전에 학습한 코드는 덮어씌워집니다. TV/에어컨 등 여러 버튼을 각각 저장해두고 쓰려면 학습된 코드를 CLI로 복사해 별도 보관했다가 `sendCode`로 재생하거나, 버튼별로 별도 자식 기기를 만드는 구조로 확장해야 합니다 — 필요하면 알려주세요.
 
@@ -29,23 +33,23 @@ MOES에서 판매하는 "Tuya ZigBee Smart IR Remote Control Universal Infrared 
 
 ### 앱에서
 
-1. 기기 상세 화면에서 "학습 시작"(또는 momentary) 버튼을 누름
-2. 몇 초 안에 기존 리모컨을 기기에 가까이 대고 버튼을 누름 → "학습된 코드"에 base64 코드가 표시되면 성공
-3. "학습된 코드 송출" 버튼을 누르면 방금 학습한 코드가 재생됨
+1. 기기 상세 화면에서 "새 신호 학습" 버튼을 누름 (학습 상태가 "학습 중"으로 바뀜)
+2. 몇 초 안에 기존 리모컨을 기기에 가까이 대고 버튼을 누름 → "저장된 신호"가 "저장됨"으로 바뀌면 성공
+3. "저장된 신호 재생" 버튼을 누르면 방금 학습한 신호가 재생됨
 
 ### CLI에서 (여러 코드를 따로 보관하고 싶을 때)
 
 ```
 # 1. 학습 시작
-smartthings devices:commands <deviceId> 'acrosswatch58328.irBlasterV2:learn()'
+smartthings devices:commands <deviceId> 'acrosswatch58328.irBlasterV3:learn()'
 
 # 2. (기존 리모컨을 기기에 가까이 대고 버튼을 누름)
 
 # 3. 학습된 코드 확인 (따로 복사/보관)
-smartthings devices:capability-status <deviceId> main acrosswatch58328.irBlasterV2
+smartthings devices:capability-status <deviceId> main acrosswatch58328.irBlasterV3
 
 # 4. 보관해둔 코드 재전송(재생) — 꼭 방금 학습한 코드가 아니어도 됨
-smartthings devices:commands <deviceId> 'acrosswatch58328.irBlasterV2:sendCode("<코드 값>")'
+smartthings devices:commands <deviceId> 'acrosswatch58328.irBlasterV3:sendCode("<코드 값>")'
 ```
 
 `<deviceId>`는 `smartthings devices`로 조회할 수 있습니다.
@@ -55,7 +59,7 @@ smartthings devices:commands <deviceId> 'acrosswatch58328.irBlasterV2:sendCode("
 ```json
 {
   "component": "main",
-  "capability": "acrosswatch58328.irBlasterV2",
+  "capability": "acrosswatch58328.irBlasterV3",
   "command": "sendCode",
   "arguments": ["<코드 값>"]
 }
@@ -92,7 +96,9 @@ smartthings devices:commands <deviceId> -i sendcode.json
 - 명령 이름을 바꿔봐도(`send` → `replayLearnedCode`) 똑같이 재현됐고, 90초 동안 6번 연속 100% 재현될 만큼 지속적이었습니다 (단순 캐시 전파 지연이 아니었음).
 - 새 capability **버전**을 만들어 우회 시도 → API가 거부 (proposed 상태 capability는 이 방식으로 버전을 못 늘림). 드라이버를 허브에서 제거 후 재설치해서 캐시를 비우려는 시도 → 플랫폼이 "기기가 사용 중"이라며 차단.
 
-**최종 해결책**: capability를 아예 새로 만들었습니다 (`acrosswatch58328.irBlasterV2`, 지금 실제로 쓰는 것) — `learn`/`cancelLearn`/`sendCode`/`replayLearnedCode` **4개 명령을 생성 시점부터 전부 포함**시켜서, "나중에 명령을 끼워넣은" 상태 자체를 만들지 않았습니다. 이후 실기기로 4개 명령 전부(학습, 학습 취소, 코드 전송, 학습된 코드 송출까지) 에러 없이 정상 동작하는 것을 Live Logging으로 확인했습니다. 즉, 근본 원인은 "capability 생성 후 명령을 추가하는 것" 자체가 SmartThings 플랫폼(클라우드 라우팅 또는 허브 캐시 중 어느 쪽인지는 불명)에서 문제를 일으켰던 것으로 보이고, **처음부터 완성된 capability를 쓰는 것**으로 완전히 우회됐습니다. (예전 capability `acrosswatch58328.irBlaster`는 더 이상 쓰지 않지만 계정에는 남아있습니다 — 삭제 API가 없어 그대로 뒀습니다.)
+**최종 해결책**: capability를 아예 새로 만들었습니다 (당시 `acrosswatch58328.irBlasterV2`) — `learn`/`cancelLearn`/`sendCode`/`replayLearnedCode` **4개 명령을 생성 시점부터 전부 포함**시켜서, "나중에 명령을 끼워넣은" 상태 자체를 만들지 않았습니다. 이후 실기기로 4개 명령 전부 에러 없이 정상 동작하는 것을 Live Logging으로 확인했습니다. 즉, 근본 원인은 "capability 생성 후 명령을 추가하는 것" 자체가 SmartThings 플랫폼(클라우드 라우팅 또는 허브 캐시 중 어느 쪽인지는 불명)에서 문제를 일으켰던 것으로 보이고, **처음부터 완성된 capability를 쓰는 것**으로 완전히 우회됐습니다.
+
+**UI 개선 (V3)**: 이후 앱 화면을 다듬으면서 `acrosswatch58328.irBlasterV3`로 한 번 더 새로 만들었습니다 (속성 스키마도 바뀌어서 — enum 값을 한국어로, 화면 전용 속성 `learnedCodeStatus` 추가 — 같은 "처음부터 완성된 capability" 원칙을 한 번 더 적용했습니다). 표준 `momentary` capability도 이제 커스텀 capability 자체에 화면 정의(presentation)가 있어서 더 이상 필요 없어 제거했습니다 (원래는 커스텀 capability만 있는 컴포넌트는 SmartThings가 기본 화면을 못 만들어서 임시로 넣어뒀던 것). 예전 capability들(`acrosswatch58328.irBlaster`, `irBlasterV2`)은 더 이상 쓰지 않지만 계정에는 남아있습니다 — 삭제 API가 없어 그대로 뒀습니다.
 
 ## 설치 방법
 
