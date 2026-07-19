@@ -49,7 +49,7 @@ local CLUSTER_ZOSUNG_TRANSMIT = 0xED00
 local ZOSUNG_MFG_CODE = 0x1002
 local CHUNK_SIZE = 0x38
 
-local IR_BLASTER_ID = "acrosswatch58328.irBlasterV3"
+local IR_BLASTER_ID = "acrosswatch58328.irBlasterV4"
 local ir_blaster = capabilities[IR_BLASTER_ID]
 
 local COMPONENT_IDS = { "main", "num1", "num2", "num3", "num4", "num5", "num6", "num7", "num8", "num9" }

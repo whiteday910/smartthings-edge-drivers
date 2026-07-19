@@ -13,7 +13,7 @@ MOES에서 판매하는 "Tuya ZigBee Smart IR Remote Control Universal Infrared 
 
 ## 지원 기능 및 앱 화면 구성
 
-커스텀 capability `acrosswatch58328.irBlasterV3` 하나로 동작하며, 아래 5가지 항목이 "0"~"9" 10개 컴포넌트 각각에 동일하게 반복됩니다 (자세한 다중 신호 구조는 아래 "여러 개의 신호 학습하기" 참고):
+커스텀 capability `acrosswatch58328.irBlasterV4` 하나로 동작하며, 아래 5가지 항목이 "0"~"9" 10개 컴포넌트 각각에 동일하게 반복됩니다 (자세한 다중 신호 구조는 아래 "여러 개의 신호 학습하기" 참고):
 
 | 화면 표시 | 종류 | 설명 |
 |---|---|---|
@@ -54,15 +54,15 @@ MOES에서 판매하는 "Tuya ZigBee Smart IR Remote Control Universal Infrared 
 
 ```
 # 1. "3"번에서 학습 시작
-smartthings devices:commands <deviceId> 'num3:acrosswatch58328.irBlasterV3:learn()'
+smartthings devices:commands <deviceId> 'num3:acrosswatch58328.irBlasterV4:learn()'
 
 # 2. (기존 리모컨을 기기에 가까이 대고 버튼을 누름)
 
 # 3. "3"번에 학습된 코드 확인 (따로 복사/보관)
-smartthings devices:capability-status <deviceId> num3 acrosswatch58328.irBlasterV3
+smartthings devices:capability-status <deviceId> num3 acrosswatch58328.irBlasterV4
 
 # 4. 보관해둔 코드를 "3"번으로 재전송(재생) — 꼭 방금 학습한 코드가 아니어도 됨
-smartthings devices:commands <deviceId> 'num3:acrosswatch58328.irBlasterV3:sendCode("<코드 값>")'
+smartthings devices:commands <deviceId> 'num3:acrosswatch58328.irBlasterV4:sendCode("<코드 값>")'
 ```
 
 `<deviceId>`는 `smartthings devices`로 조회할 수 있습니다.
@@ -72,7 +72,7 @@ smartthings devices:commands <deviceId> 'num3:acrosswatch58328.irBlasterV3:sendC
 ```json
 {
   "component": "num3",
-  "capability": "acrosswatch58328.irBlasterV3",
+  "capability": "acrosswatch58328.irBlasterV4",
   "command": "sendCode",
   "arguments": ["<코드 값>"]
 }
@@ -80,6 +80,17 @@ smartthings devices:commands <deviceId> 'num3:acrosswatch58328.irBlasterV3:sendC
 ```
 smartthings devices:commands <deviceId> -i sendcode.json
 ```
+
+## 자동화(루틴)에서 사용하기
+
+다른 무선 버튼(예: IKEA STYRBAR, 스마트 스위치 등)을 누르면 이 기기의 학습된 신호가 재생되도록 하려면, SmartThings 앱의 "자동화" > "루틴 추가"에서:
+
+1. "만약(if)" 조건에 원하는 버튼 기기를 추가 (예: "STYRBAR 버튼을 눌렀을 때")
+2. "그런 다음(then)" 동작에서 이 IR 기기를 선택 → 상단에서 원하는 번호("0" ~ "9") 선택 → **"IR 블라스터"** 항목에서 "새 신호 학습" / "학습 취소" / "저장된 신호 재생" 중 원하는 동작 선택 (보통 "저장된 신호 재생"을 쓰게 됩니다)
+
+각 번호(0~9)마다 독립적으로 루틴 액션이 노출되므로, 버튼 하나로 "3"번에 학습된 에어컨 신호를, 다른 버튼으로 "0"번에 학습된 TV 신호를 재생하는 식으로 구성할 수 있습니다.
+
+**참고**: 처음에는 이 항목이 루틴 화면에 아예 안 보였습니다 — 커스텀 capability를 만들 때 "자동화에서 쓸 수 있는 동작" 목록(`automation.actions`)을 비워뒀기 때문이었습니다. 이후 이 목록을 채워 넣었는데, 클라우드에 실제로 반영되기까지 몇 분 정도 지연이 있었습니다 (앞선 `replayLearnedCode` 이슈와 비슷한 종류의 플랫폼 쪽 전파 지연). 루틴 화면에 "IR 블라스터" 항목이 안 보이면 몇 분 후 앱을 새로고침해서 다시 확인해보세요.
 
 ## 지원하지 않는 기능 (의도적 범위 제외)
 
@@ -111,9 +122,11 @@ smartthings devices:commands <deviceId> -i sendcode.json
 
 **최종 해결책**: capability를 아예 새로 만들었습니다 (당시 `acrosswatch58328.irBlasterV2`) — `learn`/`cancelLearn`/`sendCode`/`replayLearnedCode` **4개 명령을 생성 시점부터 전부 포함**시켜서, "나중에 명령을 끼워넣은" 상태 자체를 만들지 않았습니다. 이후 실기기로 4개 명령 전부 에러 없이 정상 동작하는 것을 Live Logging으로 확인했습니다. 즉, 근본 원인은 "capability 생성 후 명령을 추가하는 것" 자체가 SmartThings 플랫폼(클라우드 라우팅 또는 허브 캐시 중 어느 쪽인지는 불명)에서 문제를 일으켰던 것으로 보이고, **처음부터 완성된 capability를 쓰는 것**으로 완전히 우회됐습니다.
 
-**UI 개선 (V3)**: 이후 앱 화면을 다듬으면서 `acrosswatch58328.irBlasterV3`로 한 번 더 새로 만들었습니다 (속성 스키마도 바뀌어서 — enum 값을 한국어로, 화면 전용 속성 `learnedCodeStatus` 추가 — 같은 "처음부터 완성된 capability" 원칙을 한 번 더 적용했습니다). 표준 `momentary` capability도 이제 커스텀 capability 자체에 화면 정의(presentation)가 있어서 더 이상 필요 없어 제거했습니다 (원래는 커스텀 capability만 있는 컴포넌트는 SmartThings가 기본 화면을 못 만들어서 임시로 넣어뒀던 것). 예전 capability들(`acrosswatch58328.irBlaster`, `irBlasterV2`)은 더 이상 쓰지 않지만 계정에는 남아있습니다 — 삭제 API가 없어 그대로 뒀습니다.
+**UI 개선 (V3)**: 이후 앱 화면을 다듬으면서 `acrosswatch58328.irBlasterV3`으로 한 번 더 새로 만들었습니다 (속성 스키마도 바뀌어서 — enum 값을 한국어로, 화면 전용 속성 `learnedCodeStatus` 추가 — 같은 "처음부터 완성된 capability" 원칙을 한 번 더 적용했습니다). 표준 `momentary` capability도 이제 커스텀 capability 자체에 화면 정의(presentation)가 있어서 더 이상 필요 없어 제거했습니다 (원래는 커스텀 capability만 있는 컴포넌트는 SmartThings가 기본 화면을 못 만들어서 임시로 넣어뒀던 것).
 
-**다중 신호(컴포넌트) 지원**: 처음에는 자식 기기 방식으로 구현했다가, "기기 하나 안에서" 여러 기능을 쓰고 싶다는 피드백을 받고 SmartThings 컴포넌트 방식(`device:emit_component_event`, `command.component`)으로 다시 만들었습니다. 실기기로 "3"번 컴포넌트에서 `learn`/`cancelLearn`을 실행했을 때 Zigbee 무선 통신은 정상적으로 나가고, 학습 상태가 정확히 "3"번에만 기록되며 "0"번은 전혀 영향받지 않는 것을 확인했습니다. "0"번(메인)에서는 실제 리모컨으로 학습한 신호를 `replayLearnedCode`로 재생해 청크 전송이 끝까지 완료되는 것("IR code transmit completed")까지 확인했습니다 — 다른 번호(1~9)도 동일한 코드 경로를 타므로 동작할 것으로 예상합니다.
+**다중 신호(컴포넌트) 지원**: 처음에는 자식 기기 방식으로 구현했다가, "기기 하나 안에서" 여러 기능을 쓰고 싶다는 피드백을 받고 SmartThings 컴포넌트 방식(`device:emit_component_event`, `command.component`)으로 다시 만들었습니다. 실기기로 "3"번 컴포넌트에서 `learn`/`cancelLearn`을 실행했을 때 Zigbee 무선 통신은 정상적으로 나가고, 학습 상태가 정확히 "3"번에만 기록되며 "0"번은 전혀 영향받지 않는 것을 확인했습니다. "0"번(메인)에서는 실제 리모컨으로 학습한 신호를 `replayLearnedCode`로 재생해 청크 전송이 끝까지 완료되는 것("IR code transmit completed")까지 확인했습니다.
+
+**루틴 액션 노출 (V4)**: 루틴(자동화)에서 이 기기의 동작을 쓸 수 없다는 피드백을 받고 보니, capability의 `automation.actions`를 비워뒀던 게 원인이었습니다. `learn`/`cancelLearn`/`replayLearnedCode`를 루틴 액션으로 노출하도록 채워 넣었는데, 기존 V3 capability를 제자리에서 업데이트하는 것만으로는 실제 기기 화면에 반영되지 않았습니다 (독립적으로 새로 만든 테스트 프로필에서는 즉시 반영되는 것으로 봐서, capability를 새로 만들지 않고 기존 것을 고치면 이미 페어링된 기기에는 어떤 이유로든 잘 전파되지 않는 것으로 보입니다 — `replayLearnedCode` 때와 동일한 패턴). 그래서 이번에도 `acrosswatch58328.irBlasterV4`로 다시 만들어(이번엔 `automation.actions`까지 처음부터 포함) 전환했고, 약 2~3분의 전파 지연 후 실기기에서 10개 컴포넌트 전부에 루틴 액션이 정상적으로 노출되는 것을 확인했습니다. 예전 capability들(`irBlaster`, `irBlasterV2`, `irBlasterV3`)은 더 이상 쓰지 않지만 계정에는 남아있습니다 — 삭제 API가 없어 그대로 뒀습니다.
 
 ## 설치 방법
 
