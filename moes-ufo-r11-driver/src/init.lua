@@ -177,8 +177,8 @@ local function build_frame_00(seq, length, clusterid, unk2, cmd)
   return string.pack("<I2I4I4I2I1I1I2", seq, length, 0, clusterid, unk2, cmd, 0)
 end
 
-local function build_frame_01(seq, length, clusterid, unk2, cmd)
-  return string.pack("<I1I2I4I4I2I1I1I2", 0, seq, length, 0, clusterid, unk2, cmd, 0)
+local function build_frame_01(seq, length, unk1, clusterid, unk2, cmd, unk3)
+  return string.pack("<I1I2I4I4I2I1I1I2", 0, seq, length, unk1, clusterid, unk2, cmd, unk3)
 end
 
 local function build_frame_02(seq, position, maxlen)
@@ -271,14 +271,14 @@ end
 local function handle_frame_00(driver, device, zb_rx)
   local zclh = zb_rx.body.zcl_header
   local body = zb_rx.body.zcl_body.body_bytes
-  local seq, length, _unk1, clusterid, unk2, cmd = string.unpack("<I2I4I4I2I1I1", body)
+  local seq, length, unk1, clusterid, unk2, cmd, unk3 = string.unpack("<I2I4I4I2I1I1I2", body)
   maybe_ack(device, zclh)
 
   device:set_field("zosung_learn_seq", seq)
   device:set_field("zosung_learn_length", length)
   device:set_field("zosung_learn_buffer", "")
 
-  send_zosung_frame(device, CLUSTER_ZOSUNG_TRANSMIT, 0x01, build_frame_01(seq, length, clusterid, unk2, cmd))
+  send_zosung_frame(device, CLUSTER_ZOSUNG_TRANSMIT, 0x01, build_frame_01(seq, length, unk1, clusterid, unk2, cmd, unk3))
   send_zosung_frame(device, CLUSTER_ZOSUNG_TRANSMIT, 0x02, build_frame_02(seq, 0, CHUNK_SIZE))
 end
 
@@ -319,7 +319,11 @@ local function handle_frame_03(driver, device, zb_rx)
     log.warn("TS1201: learn chunk checksum mismatch, keeping data anyway")
   end
 
-  local buffer = (device:get_field("zosung_learn_buffer") or "") .. msgpart
+  -- write at `position` (mirrors reference: ir_msg[position:] = msgpart) instead of
+  -- blindly appending, so a Zigbee-level retransmit of an already-seen chunk overwrites
+  -- rather than duplicating data into the buffer
+  local buffer = device:get_field("zosung_learn_buffer") or ""
+  buffer = buffer:sub(1, position) .. msgpart .. buffer:sub(position + #msgpart + 1)
   device:set_field("zosung_learn_buffer", buffer)
 
   if #buffer < (device:get_field("zosung_learn_length") or 0) then

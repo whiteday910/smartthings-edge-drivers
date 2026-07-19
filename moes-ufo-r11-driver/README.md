@@ -128,6 +128,15 @@ smartthings devices:commands <deviceId> -i sendcode.json
 
 **루틴 액션 노출 (V4)**: 루틴(자동화)에서 이 기기의 동작을 쓸 수 없다는 피드백을 받고 보니, capability의 `automation.actions`를 비워뒀던 게 원인이었습니다. `learn`/`cancelLearn`/`replayLearnedCode`를 루틴 액션으로 노출하도록 채워 넣었는데, 기존 V3 capability를 제자리에서 업데이트하는 것만으로는 실제 기기 화면에 반영되지 않았습니다 (독립적으로 새로 만든 테스트 프로필에서는 즉시 반영되는 것으로 봐서, capability를 새로 만들지 않고 기존 것을 고치면 이미 페어링된 기기에는 어떤 이유로든 잘 전파되지 않는 것으로 보입니다 — `replayLearnedCode` 때와 동일한 패턴). 그래서 이번에도 `acrosswatch58328.irBlasterV4`로 다시 만들어(이번엔 `automation.actions`까지 처음부터 포함) 전환했고, 약 2~3분의 전파 지연 후 실기기에서 10개 컴포넌트 전부에 루틴 액션이 정상적으로 노출되는 것을 확인했습니다. 예전 capability들(`irBlaster`, `irBlasterV2`, `irBlasterV3`)은 더 이상 쓰지 않지만 계정에는 남아있습니다 — 삭제 API가 없어 그대로 뒀습니다.
 
+**ZHA quirk 재대조 후 개선 (2건)**: 앞서 프로토콜을 이식할 때 이미 참고했던 ZHA의 `zhaquirks/tuya/ts1201.py`를 다시 한 줄씩 대조해보니, 청크 전송 핸드셰이크에서 두 가지가 참고 구현과 다르게 단순화되어 있었습니다.
+
+- **`frame_00`의 `unk1`/`unk3` 필드를 무시하고 항상 0으로 하드코딩**하고 있었습니다. 참고 구현(`cmd_01_args`)은 기기가 보낸 `frame_00`의 `unk1`/`unk3` 값을 그대로 `frame_01` 응답에 되돌려줍니다(echo). 실제 트래픽에서는 이 값들이 항상 0이라 지금까지는 티가 안 났지만, 항상 0이라고 가정할 근거는 없어서 원래 값을 읽어 그대로 돌려주도록 고쳤습니다.
+- **학습 데이터 버퍼를 항상 뒤에 이어붙이기(append)만** 하고 있었습니다. 참고 구현은 `ir_msg[position:] = msgpart`처럼 **해당 위치(position)에 덮어쓰는** 방식이라, Zigbee 무선 구간에서 같은 청크가 재전송되어도 데이터가 중복되지 않습니다. 반면 append 방식은 재전송이 오면 그대로 중복 삽입되어 버퍼가 깨질 수 있었습니다. `buffer:sub(1, position) .. msgpart .. buffer:sub(position + #msgpart + 1)` 형태로 위치 기반 덮어쓰기로 교체했습니다.
+
+두 수정 모두 실기기로 라이브 검증했습니다 (`learnedCode`가 학습 직후 새 base64 값으로 갱신되는 것을 `capability-status`로 확인).
+
+**부수적으로 발견한 배포 함정**: 이번에 코드를 고치고 `edge:drivers:package`만 실행한 뒤 `edge:drivers:install`을 돌렸더니, 허브에 실제로 반영된 버전이 계속 예전 것이었습니다. 원인은 `edge:channels:drivers <channelId>`로 확인해보니 **채널에 할당된 드라이버 버전 자체가 예전 버전 그대로**였기 때문이었습니다 — `package`는 내 계정에 새 버전을 올릴 뿐, 채널에 자동으로 재할당해주지 않습니다. `edge:channels:assign <driverId> --channel <channelId>`로 새 버전을 채널에 명시적으로 재할당한 뒤에야 `install`이 실제로 최신 코드를 허브에 반영했습니다. 코드를 고친 뒤 `install`만 다시 돌려도 반영이 안 되는 것 같으면, 채널에 재할당부터 확인하세요.
+
 ## 설치 방법
 
 이 드라이버 코드는 준비되어 있지만, 패키징 이후 실제 페어링은 허브와 기기가 있어야 하는 작업이라 직접 진행해주셔야 합니다.
