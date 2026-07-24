@@ -1,0 +1,4 @@
+name: 'HOBEIAN ZG-204ZM'
+packageKey: 'zg-204zm-hobeian'
+permissions:
+  zigbee: {}

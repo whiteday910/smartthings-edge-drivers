@@ -1,0 +1,71 @@
+name: zg-204zm-main
+components:
+- id: main
+  capabilities:
+  - id: motionSensor
+    version: 1
+  - id: illuminanceMeasurement
+    version: 1
+  - id: battery
+    version: 1
+  - id: refresh
+    version: 1
+  - id: acrosswatch58328.motionState
+    version: 1
+  categories:
+  - name: MotionSensor
+preferences:
+  - name: fadingTime
+    title: "재실 유지 시간"
+    description: "감지가 사라진 뒤 재실 상태를 유지할 시간 (0~28800초)"
+    required: false
+    preferenceType: integer
+    definition:
+      minimum: 0
+      maximum: 28800
+      default: 30
+  - name: staticDistance
+    title: "정지 감지 거리"
+    description: "정지 상태(재실) 감지 최대 거리 (0~6m)"
+    required: false
+    preferenceType: number
+    definition:
+      minimum: 0
+      maximum: 6
+      default: 5
+  - name: staticSensitivity
+    title: "정지 감지 민감도"
+    description: "정지 상태(재실) 감지 민감도 (0~10, 높을수록 민감)"
+    required: false
+    preferenceType: integer
+    definition:
+      minimum: 0
+      maximum: 10
+      default: 6
+  - name: motionMode
+    title: "동작 감지 모드"
+    description: "PIR/레이더 감지 방식 선택 (펌웨어 0122052017 이상 필요)"
+    required: false
+    preferenceType: enumeration
+    definition:
+      options:
+        "only_pir": "PIR 센서만"
+        "pir_and_radar": "PIR + 레이더"
+        "only_radar": "레이더만"
+      default: "only_pir"
+  - name: motionSensitivity
+    title: "동작 감지 민감도"
+    description: "움직임 감지 민감도 (0~10, 높을수록 민감, 펌웨어 0122052017 이상 필요)"
+    required: false
+    preferenceType: integer
+    definition:
+      minimum: 0
+      maximum: 10
+      default: 7
+  - name: indicator
+    title: "LED 표시등"
+    description: "기기 LED 표시등 켜짐/꺼짐"
+    required: false
+    preferenceType: boolean
+    definition:
+      default: true

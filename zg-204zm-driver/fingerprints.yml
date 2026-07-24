@@ -1,0 +1,29 @@
+zigbeeManufacturer:
+  - id: "hobeianZg204zm"
+    deviceLabel: "HOBEIAN ZG-204ZM"
+    manufacturer: "HOBEIAN"
+    model: "ZG-204ZM"
+    deviceProfileName: zg-204zm-main
+  # Generic Tuya whitelabel variants of the same module (zigbee-herdsman-converters
+  # ZG-204ZM entry), in case a unit reports the stock _TZE200_ manufacturer instead
+  # of the HOBEIAN-branded one above.
+  - id: "hobeianZg204zmTuya1"
+    deviceLabel: "HOBEIAN ZG-204ZM"
+    manufacturer: "_TZE200_2aaelwxk"
+    model: "TS0601"
+    deviceProfileName: zg-204zm-main
+  - id: "hobeianZg204zmTuya2"
+    deviceLabel: "HOBEIAN ZG-204ZM"
+    manufacturer: "_TZE200_kb5noeto"
+    model: "TS0601"
+    deviceProfileName: zg-204zm-main
+  - id: "hobeianZg204zmTuya3"
+    deviceLabel: "HOBEIAN ZG-204ZM"
+    manufacturer: "_TZE200_tyffvoij"
+    model: "TS0601"
+    deviceProfileName: zg-204zm-main
+  - id: "hobeianZg204zmTuya4"
+    deviceLabel: "HOBEIAN ZG-204ZM"
+    manufacturer: "_TZE200_yflzeeqj"
+    model: "TS0601"
+    deviceProfileName: zg-204zm-main

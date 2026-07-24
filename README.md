@@ -8,6 +8,7 @@
 |---|---|---|
 | [zgir01-driver](./zgir01-driver) | HOBEIAN ZG-IR01 | Zigbee IR 리모컨 스위치 |
 | [moes-ufo-r11-driver](./moes-ufo-r11-driver) | MOES UFO-R11 | Zigbee 범용 IR 블라스터 (Tuya TS1201 / Zosung 프로토콜) |
+| [zg-204zm-driver](./zg-204zm-driver) | HOBEIAN ZG-204ZM | Zigbee PIR+레이더 재실/모션 센서 |
 
 ## 폴더 구조
 
