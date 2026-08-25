@@ -143,12 +143,7 @@ end
 
 --------------------------------------------------
 
-local function tuya_cluster_handler(driver, device, zb_rx)
-  local rx = zb_rx.body.zcl_body.body_bytes
-  local dp = string.byte(rx, 3)
-  local fncmd_len = string.unpack(">I2", rx, 5)
-  local payload = rx:sub(7, 6 + fncmd_len)
-
+local function handle_dp(device, dp, payload)
   if dp == DP_PRESENCE then
     local active = string.byte(payload, 1) ~= 0
     device:emit_event(active and capabilities.motionSensor.motion.active() or capabilities.motionSensor.motion.inactive())
@@ -179,9 +174,32 @@ local function tuya_cluster_handler(driver, device, zb_rx)
   elseif dp == DP_MOTION_SENSITIVITY then
     log.info(string.format("ZG-204ZM: motion_detection_sensitivity = %d", string.unpack(">i4", payload)))
   else
-    log.info(string.format("ZG-204ZM: unhandled datapoint %d (len %d): %s", dp, fncmd_len, payload:gsub(".", function(c)
+    log.info(string.format("ZG-204ZM: unhandled datapoint %d (len %d): %s", dp, #payload, payload:gsub(".", function(c)
       return string.format("%02X ", string.byte(c))
     end)))
+  end
+end
+
+-- A single EF00 frame may carry several datapoints back-to-back after the
+-- 2-byte sequence number (dp(1) type(1) len(2) data(len), repeated) -- e.g.
+-- bundled presence+illuminance reports or dataQuery responses -- so parse in
+-- a loop instead of reading only the first block.
+local function tuya_cluster_handler(driver, device, zb_rx)
+  local rx = zb_rx.body.zcl_body.body_bytes
+  local pos = 3
+  while pos + 3 <= #rx do
+    local dp = string.byte(rx, pos)
+    local fncmd_len = string.unpack(">I2", rx, pos + 2)
+    local payload = rx:sub(pos + 4, pos + 3 + fncmd_len)
+    if #payload < fncmd_len then
+      log.warn(string.format("ZG-204ZM: truncated datapoint %d (want %d bytes, got %d)", dp, fncmd_len, #payload))
+      break
+    end
+    local ok, err = pcall(handle_dp, device, dp, payload)
+    if not ok then
+      log.warn(string.format("ZG-204ZM: error handling datapoint %d: %s", dp, tostring(err)))
+    end
+    pos = pos + 4 + fncmd_len
   end
 end
 

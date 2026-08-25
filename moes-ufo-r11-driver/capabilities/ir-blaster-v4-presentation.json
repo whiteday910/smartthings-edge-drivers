@@ -1,0 +1,77 @@
+{
+    "dashboard": {
+        "states": [
+            {
+                "label": "{{learnedCodeStatus.value}}"
+            }
+        ],
+        "actions": [],
+        "panelItems": []
+    },
+    "detailView": [
+        {
+            "label": "저장된 신호 재생",
+            "displayType": "pushButton",
+            "pushButton": {
+                "command": "replayLearnedCode"
+            }
+        },
+        {
+            "label": "저장된 신호",
+            "displayType": "state",
+            "state": {
+                "label": "{{learnedCodeStatus.value}}"
+            }
+        },
+        {
+            "label": "새 신호 학습",
+            "displayType": "pushButton",
+            "pushButton": {
+                "command": "learn"
+            }
+        },
+        {
+            "label": "학습 취소",
+            "displayType": "pushButton",
+            "pushButton": {
+                "command": "cancelLearn"
+            }
+        },
+        {
+            "label": "학습 상태",
+            "displayType": "state",
+            "state": {
+                "label": "{{learningState.value}}"
+            }
+        }
+    ],
+    "automation": {
+        "conditions": [],
+        "actions": [
+            {
+                "label": "IR 블라스터",
+                "displayType": "list",
+                "list": {
+                    "alternatives": [
+                        {
+                            "key": "learn",
+                            "value": "새 신호 학습",
+                            "type": "active"
+                        },
+                        {
+                            "key": "cancelLearn",
+                            "value": "학습 취소",
+                            "type": "active"
+                        },
+                        {
+                            "key": "replayLearnedCode",
+                            "value": "저장된 신호 재생",
+                            "type": "active"
+                        }
+                    ]
+                },
+                "emphasis": true
+            }
+        ]
+    }
+}

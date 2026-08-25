@@ -1,14 +1,21 @@
 -- HOBEIAN ZG-IR01 Smart IR Remote Switch
 -- Tuya EF00 datapoint driver: 6 IR switch channels + temperature/humidity/battery
--- + per-channel IR code "study" (learn) triggers via device Settings.
+-- + per-channel IR code "study" (learn), all on a single device.
+--
+-- The 6 switch channels are exposed as 6 *components* of one device ("main"
+-- labeled 스위치 1, plus switch2..switch6) instead of separate child devices,
+-- so everything lives on one device screen. Each component carries the switch
+-- capability plus a custom acrosswatch58328.irSlotStudy capability that shows
+-- the ON/OFF code registration state (datapoints 120-131 reports) and provides
+-- push buttons to start learning each code, replacing the old
+-- preference-based learn triggers.
 --
 -- This driver intentionally does NOT implement the Zosung raw IR code
 -- (arbitrary code learn/send, e.g. SmartIR library import) feature. Each
 -- switch channel's ON/OFF code is instead taught directly on the device via
 -- the "study" datapoints (120-131): point the original remote at the
--- blaster and press the button while the matching Setting is set to learn.
+-- blaster and press the button while that slot is in study mode.
 
-local st_device = require "st.device"
 local capabilities = require "st.capabilities"
 local ZigbeeDriver = require "st.zigbee"
 local zcl_messages = require "st.zigbee.zcl"
@@ -35,6 +42,8 @@ local DP_TEMP_UNIT = 111
 local DP_BATTERY = 112
 
 -- switch N -> [on-code study dp, off-code study dp]
+-- (interleaved layout and study enum values confirmed against the
+-- therealdigitalkiwi/zha-zg-ir01 quirk: Study=0, Registered=1, Unregistered=2)
 local DP_LEARN = {
   [1] = {120, 121},
   [2] = {122, 123},
@@ -43,6 +52,21 @@ local DP_LEARN = {
   [5] = {128, 129},
   [6] = {130, 131},
 }
+
+local IR_SLOT_STUDY_ID = "acrosswatch58328.irSlotStudy"
+local ir_slot_study = capabilities[IR_SLOT_STUDY_ID]
+
+local STUDY_STATE_TEXT = {
+  [0] = "학습 중",
+  [1] = "저장됨",
+  [2] = "없음",
+}
+
+local SWITCH_TO_COMPONENT = { "main", "switch2", "switch3", "switch4", "switch5", "switch6" }
+local COMPONENT_TO_SWITCH = {}
+for i, id in ipairs(SWITCH_TO_COMPONENT) do
+  COMPONENT_TO_SWITCH[id] = i
+end
 
 local packet_id = 0
 
@@ -54,10 +78,6 @@ local function round(x)
   else
     return -math.floor(-x + 0.5)
   end
-end
-
-local function child_key(switch_num)
-  return string.format("%02d", switch_num)
 end
 
 --------------------------------------------------
@@ -101,47 +121,20 @@ end
 
 --------------------------------------------------
 
-local function find_child(parent, key)
-  return parent:get_child_by_parent_assigned_key(key)
-end
-
-local function create_child_devices(driver, device)
-  for i = 2, 6 do
-    local key = child_key(i)
-    if device:get_child_by_parent_assigned_key(key) == nil then
-      driver:try_create_device({
-        type = "EDGE_CHILD",
-        parent_assigned_child_key = key,
-        label = device.label .. " " .. i,
-        profile = "zg-ir01-child-switch",
-        parent_device_id = device.id,
-      })
-    end
-  end
-end
-
-local function emit_switch_state(device, switch_num, is_on)
-  local state = is_on and capabilities.switch.switch.on() or capabilities.switch.switch.off()
-  if switch_num == 1 then
-    device:emit_event(state)
-    return
-  end
-  local child = device:get_child_by_parent_assigned_key(child_key(switch_num))
-  if child then
-    child:emit_event(state)
+local function emit_to_switch(device, switch_num, event)
+  local component_id = SWITCH_TO_COMPONENT[switch_num]
+  local component = component_id and device.profile.components[component_id]
+  if component then
+    device:emit_component_event(component, event)
   end
 end
 
 --------------------------------------------------
 
-local function tuya_cluster_handler(driver, device, zb_rx)
-  local rx = zb_rx.body.zcl_body.body_bytes
-  local dp = string.byte(rx, 3)
-  local fncmd_len = string.unpack(">I2", rx, 5)
-  local payload = rx:sub(7, 6 + fncmd_len)
-
+local function handle_dp(device, dp, payload)
   if dp >= 1 and dp <= 6 then
-    emit_switch_state(device, dp, string.byte(payload, 1) ~= 0)
+    local is_on = string.byte(payload, 1) ~= 0
+    emit_to_switch(device, dp, is_on and capabilities.switch.switch.on() or capabilities.switch.switch.off())
   elseif dp == DP_TEMPERATURE then
     local raw = string.unpack(">i4", payload)
     device:emit_event(capabilities.temperatureMeasurement.temperature({value = raw / 10.0, unit = "C"}))
@@ -151,21 +144,49 @@ local function tuya_cluster_handler(driver, device, zb_rx)
   elseif dp == DP_BATTERY then
     local raw = string.unpack(">i4", payload)
     device:emit_event(capabilities.battery.battery(math.max(0, math.min(100, raw))))
+  elseif dp >= 120 and dp <= 131 then
+    local slot = dp - 120
+    local switch_num = math.floor(slot / 2) + 1
+    local is_on_code = (slot % 2) == 0
+    local state_text = STUDY_STATE_TEXT[string.byte(payload, 1)]
+    if state_text == nil then
+      log.warn(string.format("ZG-IR01: unknown study state %d on dp %d", string.byte(payload, 1), dp))
+      return
+    end
+    local event = is_on_code and ir_slot_study.onCodeStatus(state_text) or ir_slot_study.offCodeStatus(state_text)
+    emit_to_switch(device, switch_num, event)
   else
-    log.debug(string.format("ZG-IR01: unhandled datapoint %d (len %d)", dp, fncmd_len))
+    log.debug(string.format("ZG-IR01: unhandled datapoint %d (len %d)", dp, #payload))
+  end
+end
+
+-- A single EF00 frame may carry several datapoints back-to-back after the
+-- 2-byte sequence number (dp(1) type(1) len(2) data(len), repeated) -- parse
+-- in a loop instead of reading only the first block.
+local function tuya_cluster_handler(driver, device, zb_rx)
+  local rx = zb_rx.body.zcl_body.body_bytes
+  local pos = 3
+  while pos + 3 <= #rx do
+    local dp = string.byte(rx, pos)
+    local fncmd_len = string.unpack(">I2", rx, pos + 2)
+    local payload = rx:sub(pos + 4, pos + 3 + fncmd_len)
+    if #payload < fncmd_len then
+      log.warn(string.format("ZG-IR01: truncated datapoint %d (want %d bytes, got %d)", dp, fncmd_len, #payload))
+      break
+    end
+    local ok, err = pcall(handle_dp, device, dp, payload)
+    if not ok then
+      log.warn(string.format("ZG-IR01: error handling datapoint %d: %s", dp, tostring(err)))
+    end
+    pos = pos + 4 + fncmd_len
   end
 end
 
 --------------------------------------------------
 
 local function switch_command(driver, device, command, is_on)
-  local target = device
-  local dp = 1
-  if device.network_type == st_device.NETWORK_TYPE_CHILD then
-    dp = tonumber(device.parent_assigned_child_key)
-    target = device:get_parent_device()
-  end
-  send_tuya_dp(target, dp, DP_TYPE_BOOL, is_on and "\x01" or "\x00")
+  local dp = COMPONENT_TO_SWITCH[command.component] or 1
+  send_tuya_dp(device, dp, DP_TYPE_BOOL, is_on and "\x01" or "\x00")
 end
 
 local function switch_on(driver, device, command)
@@ -176,29 +197,62 @@ local function switch_off(driver, device, command)
   switch_command(driver, device, command, false)
 end
 
+local function learn_command(device, command, is_on_code)
+  local switch_num = COMPONENT_TO_SWITCH[command.component]
+  if switch_num == nil then return end
+  local dp = DP_LEARN[switch_num][is_on_code and 1 or 2]
+  send_tuya_dp(device, dp, DP_TYPE_ENUM, "\x00")
+  -- optimistic feedback; the device's own dp report will confirm/correct it
+  local event = is_on_code and ir_slot_study.onCodeStatus("학습 중") or ir_slot_study.offCodeStatus("학습 중")
+  emit_to_switch(device, switch_num, event)
+end
+
+local function learn_on_code(driver, device, command)
+  learn_command(device, command, true)
+end
+
+local function learn_off_code(driver, device, command)
+  learn_command(device, command, false)
+end
+
 --------------------------------------------------
 
+-- Backfills default state for components that have never reported anything yet
+-- (a fresh pairing, or an already-paired device that just gained components
+-- from a profile update -- lifecycle "added" won't refire for those).
+local function ensure_defaults(device)
+  for _, component_id in ipairs(SWITCH_TO_COMPONENT) do
+    local component = device.profile.components[component_id]
+    if component ~= nil then
+      if device:get_latest_state(component_id, capabilities.switch.ID, "switch") == nil then
+        device:emit_component_event(component, capabilities.switch.switch.off())
+      end
+      if device:get_latest_state(component_id, IR_SLOT_STUDY_ID, "onCodeStatus") == nil then
+        device:emit_component_event(component, ir_slot_study.onCodeStatus("없음"))
+      end
+      if device:get_latest_state(component_id, IR_SLOT_STUDY_ID, "offCodeStatus") == nil then
+        device:emit_component_event(component, ir_slot_study.offCodeStatus("없음"))
+      end
+    end
+  end
+end
+
 local function do_configure(driver, device)
-  if device.network_type == st_device.NETWORK_TYPE_CHILD then return end
   configure_tuya_magic_packet(device)
 end
 
 local function device_added(driver, device)
-  device:emit_event(capabilities.switch.switch.off())
-  if device.network_type == st_device.NETWORK_TYPE_CHILD then return end
-  create_child_devices(driver, device)
+  ensure_defaults(device)
   device.thread:call_with_delay(2, function()
     do_configure(driver, device)
   end)
 end
 
 local function device_init(driver, device)
-  if device.network_type == st_device.NETWORK_TYPE_CHILD then return end
-  device:set_find_child(find_child)
+  ensure_defaults(device)
 end
 
 local function info_changed(driver, device, event, args)
-  if device.network_type == st_device.NETWORK_TYPE_CHILD then return end
   local old = args.old_st_store.preferences
   local new = device.preferences
 
@@ -212,18 +266,6 @@ local function info_changed(driver, device, event, args)
   if old.humidityCalibration ~= new.humidityCalibration then
     send_tuya_dp(device, DP_HUMIDITY_CALIBRATION, DP_TYPE_VALUE, string.pack(">i4", new.humidityCalibration))
   end
-
-  for i = 1, 6 do
-    local pref_name = "switch" .. i .. "Learn"
-    if old[pref_name] ~= new[pref_name] then
-      local dps = DP_LEARN[i]
-      if new[pref_name] == "learn_on" then
-        send_tuya_dp(device, dps[1], DP_TYPE_ENUM, "\x00")
-      elseif new[pref_name] == "learn_off" then
-        send_tuya_dp(device, dps[2], DP_TYPE_ENUM, "\x00")
-      end
-    end
-  end
 end
 
 --------------------------------------------------
@@ -234,12 +276,15 @@ local zg_ir01_driver = {
     capabilities.temperatureMeasurement,
     capabilities.relativeHumidityMeasurement,
     capabilities.battery,
+    ir_slot_study,
   },
   zigbee_handlers = {
     cluster = {
       [CLUSTER_TUYA] = {
-        [0x01] = tuya_cluster_handler,
-        [0x02] = tuya_cluster_handler,
+        [0x01] = tuya_cluster_handler, -- dataResponse
+        [0x02] = tuya_cluster_handler, -- dataReport
+        [0x05] = tuya_cluster_handler, -- activeStatusReportAlt (some firmwares)
+        [0x06] = tuya_cluster_handler, -- activeStatusReport
       }
     },
   },
@@ -247,6 +292,10 @@ local zg_ir01_driver = {
     [capabilities.switch.ID] = {
       [capabilities.switch.commands.on.NAME] = switch_on,
       [capabilities.switch.commands.off.NAME] = switch_off,
+    },
+    [IR_SLOT_STUDY_ID] = {
+      ["learnOnCode"] = learn_on_code,
+      ["learnOffCode"] = learn_off_code,
     },
   },
   lifecycle_handlers = {

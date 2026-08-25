@@ -1,14 +1,62 @@
 name: zg-ir01-main
 components:
 - id: main
+  label: "스위치 1"
   capabilities:
   - id: switch
+    version: 1
+  - id: acrosswatch58328.irSlotStudy
     version: 1
   - id: temperatureMeasurement
     version: 1
   - id: relativeHumidityMeasurement
     version: 1
   - id: battery
+    version: 1
+  categories:
+  - name: Switch
+- id: switch2
+  label: "스위치 2"
+  capabilities:
+  - id: switch
+    version: 1
+  - id: acrosswatch58328.irSlotStudy
+    version: 1
+  categories:
+  - name: Switch
+- id: switch3
+  label: "스위치 3"
+  capabilities:
+  - id: switch
+    version: 1
+  - id: acrosswatch58328.irSlotStudy
+    version: 1
+  categories:
+  - name: Switch
+- id: switch4
+  label: "스위치 4"
+  capabilities:
+  - id: switch
+    version: 1
+  - id: acrosswatch58328.irSlotStudy
+    version: 1
+  categories:
+  - name: Switch
+- id: switch5
+  label: "스위치 5"
+  capabilities:
+  - id: switch
+    version: 1
+  - id: acrosswatch58328.irSlotStudy
+    version: 1
+  categories:
+  - name: Switch
+- id: switch6
+  label: "스위치 6"
+  capabilities:
+  - id: switch
+    version: 1
+  - id: acrosswatch58328.irSlotStudy
     version: 1
   categories:
   - name: Switch
@@ -45,69 +93,3 @@ preferences:
       minimum: -30
       maximum: 30
       default: 0
-  - name: switch1Learn
-    title: "스위치 1 IR 코드 학습"
-    description: "학습할 항목 선택 후, 기존 리모컨을 기기에 가까이 대고 버튼을 누르세요"
-    required: false
-    preferenceType: enumeration
-    definition:
-      options:
-        "idle": "대기"
-        "learn_on": "켜짐(ON) 코드 학습 시작"
-        "learn_off": "꺼짐(OFF) 코드 학습 시작"
-      default: "idle"
-  - name: switch2Learn
-    title: "스위치 2 IR 코드 학습"
-    description: "학습할 항목 선택 후, 기존 리모컨을 기기에 가까이 대고 버튼을 누르세요"
-    required: false
-    preferenceType: enumeration
-    definition:
-      options:
-        "idle": "대기"
-        "learn_on": "켜짐(ON) 코드 학습 시작"
-        "learn_off": "꺼짐(OFF) 코드 학습 시작"
-      default: "idle"
-  - name: switch3Learn
-    title: "스위치 3 IR 코드 학습"
-    description: "학습할 항목 선택 후, 기존 리모컨을 기기에 가까이 대고 버튼을 누르세요"
-    required: false
-    preferenceType: enumeration
-    definition:
-      options:
-        "idle": "대기"
-        "learn_on": "켜짐(ON) 코드 학습 시작"
-        "learn_off": "꺼짐(OFF) 코드 학습 시작"
-      default: "idle"
-  - name: switch4Learn
-    title: "스위치 4 IR 코드 학습"
-    description: "학습할 항목 선택 후, 기존 리모컨을 기기에 가까이 대고 버튼을 누르세요"
-    required: false
-    preferenceType: enumeration
-    definition:
-      options:
-        "idle": "대기"
-        "learn_on": "켜짐(ON) 코드 학습 시작"
-        "learn_off": "꺼짐(OFF) 코드 학습 시작"
-      default: "idle"
-  - name: switch5Learn
-    title: "스위치 5 IR 코드 학습"
-    description: "학습할 항목 선택 후, 기존 리모컨을 기기에 가까이 대고 버튼을 누르세요"
-    required: false
-    preferenceType: enumeration
-    definition:
-      options:
-        "idle": "대기"
-        "learn_on": "켜짐(ON) 코드 학습 시작"
-        "learn_off": "꺼짐(OFF) 코드 학습 시작"
-      default: "idle"
-  - name: switch6Learn
-    title: "스위치 6 IR 코드 학습"
-    description: "학습할 항목 선택 후, 기존 리모컨을 기기에 가까이 대고 버튼을 누르세요"
-    required: false
-    preferenceType: enumeration
-    definition:
-      options:
-        "idle": "대기"
-        "learn_on": "켜짐(ON) 코드 학습 시작"
-        "learn_off": "꺼짐(OFF) 코드 학습 시작"
-      default: "idle"

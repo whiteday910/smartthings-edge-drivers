@@ -1,0 +1,55 @@
+{
+    "name": "IR Slot Study",
+    "attributes": {
+        "onCodeStatus": {
+            "schema": {
+                "type": "object",
+                "properties": {
+                    "value": {
+                        "type": "string",
+                        "enum": [
+                            "없음",
+                            "저장됨",
+                            "학습 중"
+                        ]
+                    }
+                },
+                "additionalProperties": false,
+                "required": [
+                    "value"
+                ]
+            },
+            "enumCommands": []
+        },
+        "offCodeStatus": {
+            "schema": {
+                "type": "object",
+                "properties": {
+                    "value": {
+                        "type": "string",
+                        "enum": [
+                            "없음",
+                            "저장됨",
+                            "학습 중"
+                        ]
+                    }
+                },
+                "additionalProperties": false,
+                "required": [
+                    "value"
+                ]
+            },
+            "enumCommands": []
+        }
+    },
+    "commands": {
+        "learnOnCode": {
+            "name": "learnOnCode",
+            "arguments": []
+        },
+        "learnOffCode": {
+            "name": "learnOffCode",
+            "arguments": []
+        }
+    }
+}

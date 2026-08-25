@@ -79,33 +79,6 @@ local function base64_encode(data)
   return table.concat(out)
 end
 
-local function base64_decode(data)
-  data = data:gsub("[^A-Za-z0-9+/=]", "")
-  local rev = {}
-  for i = 1, #B64_CHARS do
-    rev[B64_CHARS:sub(i, i)] = i - 1
-  end
-  local out = {}
-  local i = 1
-  while i + 3 <= #data + 1 do
-    local c1 = rev[data:sub(i, i)]
-    local c2 = rev[data:sub(i + 1, i + 1)]
-    local c3 = data:sub(i + 2, i + 2)
-    local c4 = data:sub(i + 3, i + 3)
-    if c1 == nil or c2 == nil then break end
-    local n = c1 * 262144 + c2 * 4096 + (rev[c3] or 0) * 64 + (rev[c4] or 0)
-    out[#out + 1] = string.char(math.floor(n / 65536) % 256)
-    if c3 ~= "=" and c3 ~= "" then
-      out[#out + 1] = string.char(math.floor(n / 256) % 256)
-    end
-    if c4 ~= "=" and c4 ~= "" then
-      out[#out + 1] = string.char(n % 256)
-    end
-    i = i + 4
-  end
-  return table.concat(out)
-end
-
 --------------------------------------------------
 -- low-level Zosung frame helpers
 
@@ -211,15 +184,37 @@ local function get_active_component(device)
   return device:get_field("active_component_id") or "main"
 end
 
-local function start_learning(device, component_id)
-  set_active_component(device, component_id)
-  send_ircontrol_json(device, { study = 0 })
-  device:emit_component_event(device.profile.components[component_id], ir_blaster.learningState("학습 중"))
-end
+local LEARN_TIMEOUT_SEC = 60
 
 local function stop_learning(device, component_id)
   send_ircontrol_json(device, { study = 1 })
   device:emit_component_event(device.profile.components[component_id], ir_blaster.learningState("대기"))
+end
+
+local function start_learning(device, component_id)
+  -- The physical device has a single study mode, so a new learn session
+  -- supersedes any previous one -- clear stale "학습 중" left on other components
+  for _, cid in ipairs(COMPONENT_IDS) do
+    if cid ~= component_id
+        and device:get_latest_state(cid, IR_BLASTER_ID, "learningState") == "학습 중" then
+      device:emit_component_event(device.profile.components[cid], ir_blaster.learningState("대기"))
+    end
+  end
+  set_active_component(device, component_id)
+  local token = (device:get_field("learn_token") or 0) + 1
+  device:set_field("learn_token", token)
+  send_ircontrol_json(device, { study = 0 })
+  device:emit_component_event(device.profile.components[component_id], ir_blaster.learningState("학습 중"))
+  -- Watchdog: if no code arrives (device gave up, signal never sent), the UI
+  -- would show "학습 중" forever. The token guard makes a newer learn/cancel
+  -- render this timer a no-op.
+  device.thread:call_with_delay(LEARN_TIMEOUT_SEC, function()
+    if device:get_field("learn_token") == token
+        and device:get_latest_state(component_id, IR_BLASTER_ID, "learningState") == "학습 중" then
+      log.info("TS1201: learn timed out for component " .. component_id)
+      stop_learning(device, component_id)
+    end
+  end)
 end
 
 -- Builds the Zosung "key press" JSON message for a given code. `code` may be:

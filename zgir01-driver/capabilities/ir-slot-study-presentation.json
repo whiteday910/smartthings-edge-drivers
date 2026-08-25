@@ -1,0 +1,61 @@
+{
+    "dashboard": {
+        "states": [],
+        "actions": [],
+        "panelItems": []
+    },
+    "detailView": [
+        {
+            "label": "켜짐(ON) 신호",
+            "displayType": "state",
+            "state": {
+                "label": "{{onCodeStatus.value}}"
+            }
+        },
+        {
+            "label": "꺼짐(OFF) 신호",
+            "displayType": "state",
+            "state": {
+                "label": "{{offCodeStatus.value}}"
+            }
+        },
+        {
+            "label": "켜짐(ON) 신호 학습",
+            "displayType": "pushButton",
+            "pushButton": {
+                "command": "learnOnCode"
+            }
+        },
+        {
+            "label": "꺼짐(OFF) 신호 학습",
+            "displayType": "pushButton",
+            "pushButton": {
+                "command": "learnOffCode"
+            }
+        }
+    ],
+    "automation": {
+        "conditions": [],
+        "actions": [
+            {
+                "label": "IR 신호 학습",
+                "displayType": "list",
+                "list": {
+                    "alternatives": [
+                        {
+                            "key": "learnOnCode",
+                            "value": "켜짐(ON) 신호 학습",
+                            "type": "active"
+                        },
+                        {
+                            "key": "learnOffCode",
+                            "value": "꺼짐(OFF) 신호 학습",
+                            "type": "active"
+                        }
+                    ]
+                },
+                "emphasis": true
+            }
+        ]
+    }
+}
