@@ -5,7 +5,14 @@
                 "label": "{{learnedCodeStatus.value}}"
             }
         ],
-        "actions": [],
+        "actions": [
+            {
+                "displayType": "pushButton",
+                "pushButton": {
+                    "command": "replayLearnedCode"
+                }
+            }
+        ],
         "panelItems": []
     },
     "detailView": [

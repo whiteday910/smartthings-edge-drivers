@@ -70,3 +70,7 @@ components:
     version: 1
   categories:
   - name: IrRemote
+metadata:
+  deviceType: RemoteController
+  ocfDeviceType: x.com.st.d.remotecontroller
+  deviceTypeId: RemoteController
