@@ -249,11 +249,25 @@ local function build_ir_message(code)
   })
 end
 
+-- The device queues incoming transfers and pulls them one at a time (chunk requests
+-- for the second only start once the first finishes), so overlapping sends -- a
+-- double tap, or a routine replaying two slots -- must each keep their payload until
+-- the device asks for it: a payload dropped early leaves the device re-requesting
+-- that seq for ~20 s with nothing transmitted, stalling every transfer queued behind
+-- it. Mirrors zhaquirks' ir_msg_to_send[seq], pruned to the most recent few the same way.
+local MAX_PENDING_SENDS = 8
+
 local function send_ir_code(device, code)
   local ir_msg = build_ir_message(code)
   local seq = next_seq(device)
-  device:set_field("zosung_send_seq", seq)
-  device:set_field("zosung_send_message", ir_msg)
+  local pending = device:get_field("zosung_send_pending") or {}
+  for s in pairs(pending) do
+    if (seq - s) % 0x10000 >= MAX_PENDING_SENDS then
+      pending[s] = nil
+    end
+  end
+  pending[seq] = ir_msg
+  device:set_field("zosung_send_pending", pending)
   send_zosung_frame(
     device, CLUSTER_ZOSUNG_TRANSMIT, 0x00,
     build_frame_00(seq, #ir_msg, CLUSTER_ZOSUNG_CONTROL, 0x01, 0x02)
@@ -288,8 +302,8 @@ local function handle_frame_02(driver, device, zb_rx)
   local seq, position, maxlen = string.unpack("<I2I4I1", body)
   maybe_ack(device, zclh)
 
-  local msg = device:get_field("zosung_send_message")
-  if msg == nil or seq ~= device:get_field("zosung_send_seq") then
+  local msg = (device:get_field("zosung_send_pending") or {})[seq]
+  if msg == nil then
     log.warn("TS1201: chunk request for unknown transfer (seq " .. tostring(seq) .. ")")
     return
   end
@@ -331,13 +345,22 @@ end
 local function handle_frame_04(driver, device, zb_rx)
   local zclh = zb_rx.body.zcl_header
   local body = zb_rx.body.zcl_body.body_bytes
-  local _zero0, seq = string.unpack("<I1I2", body)
+  -- First byte is 0x00 when the code went out; the device sends 0x03 after giving up
+  -- on a transfer whose chunks never came (seen on real hardware), so it must not be
+  -- reported as a success
+  local status, seq = string.unpack("<I1I2", body)
   maybe_ack(device, zclh)
 
   send_zosung_frame(device, CLUSTER_ZOSUNG_TRANSMIT, 0x05, build_frame_05(seq))
-  device:set_field("zosung_send_message", nil)
-  device:set_field("zosung_send_seq", nil)
-  log.info("TS1201: IR code transmit completed")
+  local pending = device:get_field("zosung_send_pending")
+  if pending ~= nil then
+    pending[seq] = nil
+  end
+  if status == 0 then
+    log.info("TS1201: IR code transmit completed (seq " .. seq .. ")")
+  else
+    log.warn(string.format("TS1201: IR code transmit failed (seq %d, status 0x%02X)", seq, status))
+  end
 end
 
 local function handle_frame_05(driver, device, zb_rx)
